@@ -196,6 +196,27 @@ def get_data(
 
     return task, data, col_stats_dict
 
+def test_get_data(
+    dataset_name: str,
+    task_name: str,
+    cache_path: str,
+    entity_table_only: bool = False,
+    aggregate_neighbors: bool = False,
+):
+    dataset = get_dataset(dataset_name)
+    task = get_task(dataset_name, task_name)
+    if isinstance(task, CTUBaseEntityTask):
+        db = task.get_sanitized_db(upto_test_timestamp=False)
+    else:
+        db = dataset.get_db(upto_test_timestamp=False)
+
+    convert_timedelta(db)
+    attribute_schema = get_attribute_schema(
+        f"{cache_path}/attribute_schema.json",
+        db,
+        sql_schema=dataset.get_schema() if isinstance(dataset, DBDataset) else None,
+    )
+    return db, attribute_schema
 
 __all__ = [
     "get_text_embedder",
@@ -206,3 +227,6 @@ __all__ = [
     "get_attribute_schema",
     "get_data",
 ]
+
+
+
