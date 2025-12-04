@@ -1,4 +1,10 @@
-from .db_inspector import DBInspector
-from .column_types import ForeignKey
+from .foreign_key import ForeignKey
+from .inspector import DBInspector
 
-__all__ = ["DBInspector", "ForeignKey"]
+__all__ = [
+    "ForeignKey",
+    "DBInspector",
+    "DBInterface",
+    "RelbenchDBInterface",
+    "RemoteDBInterface",
+]
