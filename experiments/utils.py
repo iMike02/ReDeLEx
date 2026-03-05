@@ -28,6 +28,7 @@ from relbench.metrics import (
     roc_auc,
 )
 
+from redelex.data.make_graph import make_pkey_fkey_graph_custom
 from redelex.data import (
     TextEmbedder,
     GloveTextEmbedder,
@@ -171,11 +172,15 @@ def get_data(
     )
     db_interface.close()
 
-    data, col_stats_dict = make_pkey_fkey_graph(
+    data, col_stats_dict = make_pkey_fkey_graph_custom(
         db,
         col_to_stype_dict=attribute_schema,
         text_embedder=get_text_embedder(text_embedder_name),
         cache_dir=f"{cache_path}/materialized",
+        process_bridge=process_bridge,
+        bridgeStrategy=bridgeStrategy,
+        process_hub=process_hub,
+        hubStrategy=hubStrategy
     )
 
     if entity_table_only and aggregate_neighbors:
@@ -208,6 +213,77 @@ def get_data(
 
     return task, data, col_stats_dict
 
+
+def get_data_custom(
+    dataset_name: str,
+    task_name: str,
+    cache_path: str,
+    entity_table_only: bool = False,
+    aggregate_neighbors: bool = False,
+    process_bridge: bool = False,
+    bridgeStrategy: str = "default",
+    process_hub: bool = False,
+    hubStrategy: str = "default_combinations"
+):
+    """Similar to get_data but uses the custom MakeGraph class with configurable bridge and hub processing."""
+    dataset = get_dataset(dataset_name)
+    task = get_task(dataset_name, task_name)
+    if isinstance(task, CTUBaseEntityTask):
+        db = task.get_sanitized_db(upto_test_timestamp=False)
+    else:
+        db = dataset.get_db(upto_test_timestamp=False)
+
+    convert_timedelta(db)
+    attribute_schema = get_attribute_schema(
+        f"{cache_path}/attribute_schema.json",
+        db,
+        sql_schema=dataset.get_schema() if isinstance(dataset, DBDataset) else None,
+    )
+
+    data, col_stats_dict = make_pkey_fkey_graph_custom(
+        db,
+        col_to_stype_dict=attribute_schema,
+        text_embedder_cfg=TextEmbedderConfig(
+            text_embedder=GloveTextEmbedding(device=torch.device("cpu")), batch_size=256
+        ),
+        cache_dir=f"{cache_path}/materialized",
+        process_bridge=process_bridge,
+        bridgeStrategy=bridgeStrategy,
+        process_hub=process_hub,
+        hubStrategy=hubStrategy
+    )
+
+    if entity_table_only and aggregate_neighbors:
+        edge_dict = data.collect("edge_index")
+        node_tf = data[task.entity_table].tf
+        for (src, edge_name, dst), edge_index in edge_dict.items():
+            if (
+                src == task.entity_table
+                and edge_index[0].unique(return_counts=True)[1].max() == 1
+            ):
+                prefix = f"{edge_name}_"
+                node_tf = merge_tf(
+                    left_tf=node_tf,
+                    right_tf=data[dst].tf,
+                    left_idx=edge_index[0],
+                    right_idx=edge_index[1],
+                    right_prefix=prefix,
+                )
+                col_stats_dict[task.entity_table].update(
+                    {f"{prefix}{k}": v for k, v in col_stats_dict[dst].items()}
+                )
+        data[task.entity_table].tf = node_tf
+
+    if entity_table_only:
+        return (
+            task,
+            HeteroData({task.entity_table: data[task.entity_table]}),
+            {task.entity_table: col_stats_dict[task.entity_table]},
+        )
+
+    return task, data, col_stats_dict
+
+
 def test_get_data(
     dataset_name: str,
     task_name: str,
@@ -239,6 +315,7 @@ __all__ = [
     "get_loss",
     "get_attribute_schema",
     "get_data",
+    "get_data_custom",
 ]
 
 
