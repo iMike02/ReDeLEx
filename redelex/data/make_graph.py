@@ -94,14 +94,19 @@ class MakeGraph:
         pkey_index_2 = torch.from_numpy(pkey_index_2[mask].astype(int).values)
 
 
+        # Include the link table name in relation labels so edges from
+        # different link tables never collide in HeteroData.
+        relation_label = f"p2p_{table_name}_{fkey_name}_{fkey_name_2}"
+        rev_relation_label = f"rev_p2p_{table_name}_{fkey_name}_{fkey_name_2}"
+
         # fkey1 -> fkey2
         edge_index_1 = torch.stack([pkey_index, pkey_index_2], dim=0)
-        edge_type_1 = (pkey_table_name, f"p2p_{fkey_name}_{fkey_name_2}", pkey_table_name_2)
+        edge_type_1 = (pkey_table_name, relation_label, pkey_table_name_2)
         self.data[edge_type_1].edge_index = edge_index_1
 
         # fkey2 -> fkey1
         edge_index_2 = torch.stack([pkey_index_2, pkey_index], dim=0)
-        edge_type_2 = (pkey_table_name_2, f"rev_p2p_{fkey_name}_{fkey_name_2}", pkey_table_name)
+        edge_type_2 = (pkey_table_name_2, rev_relation_label, pkey_table_name)
         self.data[edge_type_2].edge_index = edge_index_2
 
         # Adds edge attributes instead of throwing data away
@@ -229,8 +234,8 @@ class MakeGraph:
 
             if process_hub and len(table.fkey_col_to_pkey_table.items()) >= 3:
                 self.hub_structure_to_graph(df, table_name, table, dataset, hubStrategy)
-            
-            if process_bridge and len(table.fkey_col_to_pkey_table.items()) == 2:
+
+            elif process_bridge and len(table.fkey_col_to_pkey_table.items()) == 2:
                 self.bridge_structure_to_graph(df, table_name, table, dataset, bridgeStrategy)
 
             else:

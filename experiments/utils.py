@@ -10,6 +10,7 @@ from torch.nn import BCEWithLogitsLoss, L1Loss, CrossEntropyLoss
 
 from torch_frame import stype
 from torch_frame.data import StatType
+from torch_frame.config import TextEmbedderConfig
 
 from torch_geometric.data import HeteroData
 
@@ -172,15 +173,11 @@ def get_data(
     )
     db_interface.close()
 
-    data, col_stats_dict = make_pkey_fkey_graph_custom(
+    data, col_stats_dict = make_pkey_fkey_graph(
         db,
         col_to_stype_dict=attribute_schema,
         text_embedder=get_text_embedder(text_embedder_name),
         cache_dir=f"{cache_path}/materialized",
-        process_bridge=process_bridge,
-        bridgeStrategy=bridgeStrategy,
-        process_hub=process_hub,
-        hubStrategy=hubStrategy
     )
 
     if entity_table_only and aggregate_neighbors:
@@ -220,6 +217,7 @@ def get_data_custom(
     cache_path: str,
     entity_table_only: bool = False,
     aggregate_neighbors: bool = False,
+    text_embedder_name: str = "glove",
     process_bridge: bool = False,
     bridgeStrategy: str = "default",
     process_hub: bool = False,
@@ -228,24 +226,30 @@ def get_data_custom(
     """Similar to get_data but uses the custom MakeGraph class with configurable bridge and hub processing."""
     dataset = get_dataset(dataset_name)
     task = get_task(dataset_name, task_name)
-    if isinstance(task, CTUBaseEntityTask):
-        db = task.get_sanitized_db(upto_test_timestamp=False)
+    if isinstance(task, ModifyDBTaskMixin):
+        db = task.make_modified_db(inplace=False)
     else:
         db = dataset.get_db(upto_test_timestamp=False)
 
     convert_timedelta(db)
-    attribute_schema = get_attribute_schema(
-        f"{cache_path}/attribute_schema.json",
-        db,
-        sql_schema=dataset.get_schema() if isinstance(dataset, DBDataset) else None,
+    db_interface = (
+        RemoteDBInterface(dataset.remote_url)
+        if isinstance(dataset, DBDataset)
+        else RelbenchDBInterface(dataset)
     )
+    db_interface.connect()
+    attribute_schema = get_attribute_schema(
+        f"{cache_path}/attribute_schema.json", db, db_schema=db_interface.get_schema()
+    )
+    db_interface.close()
 
+    text_embedder = get_text_embedder(text_embedder_name)
+    text_embedder_cfg = TextEmbedderConfig(text_embedder=text_embedder, batch_size=256)
+    
     data, col_stats_dict = make_pkey_fkey_graph_custom(
         db,
         col_to_stype_dict=attribute_schema,
-        text_embedder_cfg=TextEmbedderConfig(
-            text_embedder=GloveTextEmbedding(device=torch.device("cpu")), batch_size=256
-        ),
+        text_embedder_cfg=text_embedder_cfg,
         cache_dir=f"{cache_path}/materialized",
         process_bridge=process_bridge,
         bridgeStrategy=bridgeStrategy,

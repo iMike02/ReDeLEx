@@ -1,217 +1,66 @@
 import pandas as pd
-import itertools
-from collections import defaultdict
-from torch_geometric.data import HeteroData
 
-from relbench.datasets import get_dataset, get_dataset_names
+from relbench.datasets import get_dataset_names
 
-from redelex.db import DBInspector
-from redelex.db.utils import get_rdb_connection
-
-
-
-
-def bfs(adj, start):
-    """Breadth-first search to compute distances from start node."""
-    dist = {start: 0}
-    queue = [start]
-    head = 0
-
-    while head < len(queue):
-        u = queue[head]
-        head += 1
-
-        for v in adj[u]:
-            if v not in dist:
-                dist[v] = dist[u] + 1
-                queue.append(v)
-
-    return dist
+from redelex.data.graph_utils import (
+    create_HeteroData_from_ctu_inspector,
+    create_HeteroData_from_relbench_source,
+    graph_density,
+    graph_diameter,
+    graph_max_degree,
+    graph_node2edge_ratio,
+    number_of_nodes_edges,
+)
 
 
-def graph_max_degree(data: HeteroData):
-    """Calculate maximum and average degree in the graph."""
-    edge_types = data.edge_types
-    degrees = defaultdict(int)
-
-    for edge_key in edge_types:
-        src, edg, dst = edge_key
-        degrees[src] += 1
-
-    max_degree = max(degrees.values()) if degrees else 0
-    avg_degree = sum(degrees.values()) / len(degrees) if degrees else 0
-    return max_degree, avg_degree
-
-
-def graph_density(data: HeteroData):
-    """Calculate graph density."""
-    num_nodes = len(data.node_types)
-    num_edges = int(len(data.edge_types) / 2)  # Divide by 2 for reverse edges
-
-    if num_nodes <= 1:
-        return 0
-    return num_edges / (num_nodes * (num_nodes - 1))
-
-
-def graph_diameter(data: HeteroData):
-    """Calculate graph diameter and average diameter."""
-    edge_types = data.edge_types
-    adj = defaultdict(list)
-
-    for edge_key in edge_types:
-        src, edg, dst = edge_key
-        adj[src].append(dst)
-
-    diameter = 0
-    all_distances = []
-    for node in data.node_types:
-        dist = bfs(adj, node)
-        if dist.values():
-            diameter = max(diameter, max(dist.values()))
-            all_distances.extend(dist.values())
-    
-    avg_diameter = sum(all_distances) / len(all_distances) if all_distances else 0
-    return diameter, avg_diameter
-
-def graph_node2edge_ratio(data: HeteroData):
-    num_nodes = len(data.node_types)
-    num_edges = int(len(data.edge_types) / 2)
-
-    if num_edges == 0:
-        return 0
-    return num_nodes / num_edges
-
-
-def create_HeteroData(inspector: DBInspector) -> HeteroData:
-    """Create default HeteroData from database schema."""
-    data = HeteroData()
-    for t in inspector.get_tables():
-        fkeys = inspector.get_foreign_keys(t)
-        data[t]
-        for fk in fkeys:
-            edge_type = (t, f"f2p_{fk.src_columns[0]}", fk.ref_table)
-            rev_edge_type = (fk.ref_table, f"rev_f2p_{fk.src_columns[0]}", t)
-            data[edge_type]
-            data[rev_edge_type]
-    return data
-
-
-def create_HeteroData_with_hub_bridge(
-    inspector: DBInspector, 
-    process_hub: bool = False, 
+def create_dataset_HeteroData(
+    dataset_name: str,
+    process_hub: bool = False,
     process_bridge: bool = False,
     keep_hub_table: bool = False,
-    keep_bridge_table: bool = False
-) -> HeteroData:
-    """Create HeteroData with optional hub/bridge processing."""
-    
-    data = HeteroData()
-    cannot_delete = {}
-    
-    # Determine which tables cannot be deleted
-    for table in inspector.get_tables():
-        cannot_delete[table] = False
-    
-    for table in inspector.get_tables():
-        fkeys = inspector.get_foreign_keys(table)
-        for fk in fkeys:
-            cannot_delete[fk.ref_table] = True
-    
-    # Create nodes and edges
-    for table in inspector.get_tables():
-        fkeys = inspector.get_foreign_keys(table)
-        fkey_dict = {fk.src_columns[0]: fk.ref_table for fk in fkeys}
-        
-        # Process hub tables (3+ foreign keys)
-        if process_hub and len(fkey_dict) >= 3:
-            fkey_pairs = list(itertools.combinations(fkey_dict.items(), 2))
-            for (fkey_name_1, ref_table_1), (fkey_name_2, ref_table_2) in fkey_pairs:
-                edge_type_1 = (ref_table_1, f"p2p_{fkey_name_1}_{fkey_name_2}", ref_table_2)
-                edge_type_2 = (ref_table_2, f"rev_p2p_{fkey_name_1}_{fkey_name_2}", ref_table_1)
-                data[edge_type_1]
-                data[edge_type_2]
-            
-            if keep_hub_table or cannot_delete[table]:
-                data[table]
-                for fk in fkeys:
-                    edge_type = (table, f"f2p_{fk.src_columns[0]}", fk.ref_table)
-                    rev_edge_type = (fk.ref_table, f"rev_f2p_{fk.src_columns[0]}", table)
-                    data[edge_type]
-                    data[rev_edge_type]
-        
-        # Process bridge tables (exactly 2 foreign keys)
-        elif process_bridge and len(fkey_dict) == 2:
-            fkeys_list = list(fkey_dict.items())
-            fkey_name_1, ref_table_1 = fkeys_list[0]
-            fkey_name_2, ref_table_2 = fkeys_list[1]
-            
-            edge_type_1 = (ref_table_1, f"p2p_{fkey_name_1}_{fkey_name_2}", ref_table_2)
-            edge_type_2 = (ref_table_2, f"rev_p2p_{fkey_name_1}_{fkey_name_2}", ref_table_1)
-            data[edge_type_1]
-            data[edge_type_2]
-            
-            if keep_bridge_table or cannot_delete[table]:
-                data[table]
-                for fk in fkeys:
-                    edge_type = (table, f"f2p_{fk.src_columns[0]}", fk.ref_table)
-                    rev_edge_type = (fk.ref_table, f"rev_f2p_{fk.src_columns[0]}", table)
-                    data[edge_type]
-                    data[rev_edge_type]
-        
-        # Default: create standard primary-foreign key edges
-        else:
-            data[table]
-            for fk in fkeys:
-                edge_type = (table, f"f2p_{fk.src_columns[0]}", fk.ref_table)
-                rev_edge_type = (fk.ref_table, f"rev_f2p_{fk.src_columns[0]}", table)
-                data[edge_type]
-                data[rev_edge_type]
-    
-    return data
+    keep_bridge_table: bool = False,
+):
+    """
+    Creates HeteroData object for RelBench and CTU datasets based on the dataset name prefix.
+    - RelBench - "rel-": from source-code extraction (no DB download).
+    - CTU      - "ctu-": from DB inspector.
+    """
+    if dataset_name.startswith("rel-"):
+        return create_HeteroData_from_relbench_source(
+            dataset_name,
+            process_hub=process_hub,
+            process_bridge=process_bridge,
+            keep_hub_table=keep_hub_table,
+            keep_bridge_table=keep_bridge_table,
+        )
 
+    if dataset_name.startswith("ctu-"):
+        return create_HeteroData_from_ctu_inspector(
+            dataset_name,
+            process_hub=process_hub,
+            process_bridge=process_bridge,
+            keep_hub_table=keep_hub_table,
+            keep_bridge_table=keep_bridge_table,
+        )
 
-def number_of_nodes_edges(data: HeteroData):
-    """Count nodes and edges in HeteroData."""
-    num_nodes = len(data.node_types)
-    num_edges = int(len(data.edge_types) / 2)  # Divide by 2 for reverse edges
-    return num_nodes, num_edges
-
-
-def number_of_hubs_bridges(inspector: DBInspector):
-    """Count hub and bridge tables in database schema."""
-    num_hubs = 0
-    num_bridges = 0
-    for t in inspector.get_tables():
-        fkeys = inspector.get_foreign_keys(t)
-        fkey_dict = {fk.src_columns[0]: fk.ref_table for fk in fkeys}
-        
-        if len(fkey_dict) >= 3:
-            num_hubs += 1
-        if len(fkey_dict) == 2:
-            num_bridges += 1
-    
-    return num_hubs, num_bridges
+    raise ValueError(
+        f"Unsupported dataset prefix for '{dataset_name}'. Expected 'rel-' or 'ctu-'."
+    )
 
 
 def compute_metrics_for_dataset(name: str, process_hub: bool, process_bridge: bool):
     """Compute all graph metrics for a single dataset."""
     print(f"Processing {name}...")
-    
-    dataset = get_dataset(name)
-    inspector = DBInspector(get_rdb_connection(dataset.remote_url))
 
-    # Create graphs
-    data_default = create_HeteroData(inspector)
-    data_processed = create_HeteroData_with_hub_bridge(
-        inspector, 
-        process_hub=process_hub, 
-        process_bridge=process_bridge
+    data_default, data_processed, default_hubs, default_bridges = create_dataset_HeteroData(
+        name,
+        process_hub=process_hub,
+        process_bridge=process_bridge,
     )
 
     # Basic counts
     default_nodes, default_edges = number_of_nodes_edges(data_default)
     processed_nodes, processed_edges = number_of_nodes_edges(data_processed)
-    default_hubs, default_bridges = number_of_hubs_bridges(inspector)
 
     # Graph metrics - default
     default_diameter, default_avg_diameter = graph_diameter(data_default)
@@ -256,8 +105,6 @@ def compute_metrics_for_dataset(name: str, process_hub: bool, process_bridge: bo
     else:
         normalized_hubs_bridges_ratio = None
 
-    inspector.connection.close()
-
     return {
         'dataset': name,
         'num_hubs': default_hubs,
@@ -294,15 +141,17 @@ def compute_metrics_for_dataset(name: str, process_hub: bool, process_bridge: bo
 def main():
     """Main function to compute metrics for all datasets and save to CSV."""
     # Configuration
-    process_hub = True
-    process_bridge = False
-    output_file = "graph_metrics_info_hubs.csv"
-    dataset_start_index = 7  # Start from index 7 in dataset list
+    process_hub = False
+    process_bridge = True
+    output_file = "graph_metrics_test_bridges.csv"
 
-    names = get_dataset_names()[dataset_start_index:]
+    names = get_dataset_names()
     results = []
 
     for name in names:
+        if not (name.startswith("rel-") or name.startswith("ctu-")):
+            print(f"Skipping {name}: unsupported prefix (expected rel- or ctu-)")
+            continue
         try:
             metrics = compute_metrics_for_dataset(name, process_hub, process_bridge)
             results.append(metrics)

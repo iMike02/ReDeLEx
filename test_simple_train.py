@@ -1,33 +1,25 @@
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Dict, Literal
 
-import math
 import os
 import random
 import json
+from timeit import default_timer as timer
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 
-from argparse import ArgumentParser
-from datetime import datetime
-from timeit import default_timer as timer
-
 import numpy as np
-
 from tqdm import tqdm
-
 import torch
 
 from torch_frame.data import StatType
-
 from torch_geometric.data import HeteroData
 from torch_geometric.loader import NeighborLoader
 
-
 from relbench.base import BaseTask, EntityTask, TaskType
 from relbench.tasks import get_task
+from relbench.modeling.graph import get_node_train_table_input
 
-from redelex.data import get_node_train_table_input
-from redelex.tasks import CTUBaseEntityTask, CTUEntityTaskTemporal
+from redelex.tasks import CTUEntityTaskTemporal
 from redelex.nn.models.sagegnn import SAGEModel
 from redelex.nn.models.dbformer import DBFormerModel
 from redelex.nn.models.sage_edge_attr import SAGEEdgeAttrModel
@@ -40,104 +32,86 @@ from experiments.utils import (
     get_tune_metric,
 )
 
-# Ray imports (optional, only needed for tuning)
-try:
-    import ray
-    from ray import tune
-    from ray import train as ray_train
-    from ray.tune.schedulers import ASHAScheduler
-    from ray.tune.logger.mlflow import MLflowLoggerCallback
-    from ray.tune.logger.aim import AimLoggerCallback
-    RAY_AVAILABLE = True
-except ImportError:
-    RAY_AVAILABLE = False
 
-
-def get_model(architecture: Literal["sage", "dbformer", "sage_edge_attr"], entity_table: str, **kwargs):
-    if architecture == "sage":
-        return SAGEModel(**kwargs)
-    elif architecture == "dbformer":
-        return DBFormerModel(entity_table=entity_table, **kwargs)
-    elif architecture == "sage_edge_attr":
-        return SAGEEdgeAttrModel(**kwargs)
-    else:
-        raise ValueError(f"Unknown architecture: {architecture}")
-
-
-def run_training(
-    config: Dict[str, Any],
-    data: Optional[HeteroData] = None,
-    task: Optional[BaseTask] = None,
-    col_stats_dict: Optional[Dict] = None,
-    use_ray: bool = False,
+def simple_train_test(
+    dataset_name: str,
+    task_name: str,
+    model_architecture: str = "sage",
+    tabular_model: str = "resnet",
+    random_seed: int = 42,
+    lr: float = 0.001,
+    num_epochs: int = 5,
+    batch_size: int = 64,
+    channels: int = 64,
+    num_layers: int = 2,
+    num_neighbors: int = 16,
+    max_steps_per_epoch: int = 10,
+    aggr: str = "sum",
+    norm: str = "batch_norm",
+    process_bridge: bool = False,
+    bridge_strategy: str = "default",
+    process_hub: bool = False,
+    hub_strategy: str = "default_combinations",
+    cache_dir: str = ".cache",
 ):
     """
-    Core training function that works with both standalone and Ray Tune modes.
+    Simple training test function.
     
     Args:
-        config: Configuration dictionary
-        data: Pre-loaded HeteroData (for Ray Tune to avoid reloading)
-        task: Pre-loaded task (for Ray Tune)
-        col_stats_dict: Pre-loaded column statistics (for Ray Tune)
-        use_ray: Whether to report to Ray Tune
+        dataset_name: Name of the dataset
+        task_name: Name of the task
+        model_architecture: Model architecture ('sage', 'dbformer', 'sage_edge_attr')
+        tabular_model: Tabular model type ('resnet', 'linear')
+        random_seed: Random seed for reproducibility
+        lr: Learning rate
+        num_epochs: Number of training epochs
+        batch_size: Batch size for training
+        channels: Number of hidden channels
+        num_layers: Number of GNN layers
+        num_neighbors: Number of neighbors to sample
+        max_steps_per_epoch: Maximum training steps per epoch
+        aggr: Aggregation function ('sum', 'mean', 'max')
+        norm: Normalization type ('batch_norm', 'layer_norm')
+        process_bridge: Whether to process bridge tables
+        bridge_strategy: Strategy for bridge table processing
+        process_hub: Whether to process hub tables
+        hub_strategy: Strategy for hub table processing
+        cache_dir: Directory for caching data
     """
-    # Extract config values
-    dataset_name = config["dataset"]
-    task_name = config["task"]
-    model_architecture = config["model"]
-    tabular_model = config["tabular_model"]
-    random_seed = config["seed"]
-    lr = config["lr"]
-    num_epochs = config["epochs"]
-    batch_size = config["batch_size"]
-    channels = config["channels"]
-    num_layers = config["num_layers"]
-    num_neighbors = config["num_neighbors"]
-    max_steps_per_epoch = config["max_steps_per_epoch"]
-    aggr = config["aggr"]
-    norm = config["norm"]
-    process_bridge = config.get("process_bridge", False)
-    bridge_strategy = config.get("bridge_strategy", "default")
-    process_hub = config.get("process_hub", False)
-    hub_strategy = config.get("hub_strategy", "default_combinations")
-    cache_dir = config.get("cache_dir", ".cache")
-
+    
     # Set seeds
     random.seed(random_seed)
     np.random.seed(random_seed)
     torch.manual_seed(random_seed)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    if not use_ray:
-        print(f"Using device: {device}")
+    print(f"Using device: {device}")
 
-    # Load data if not provided (standalone mode)
-    if data is None or task is None or col_stats_dict is None:
-        cache_path = get_cache_path(dataset_name, task_name, cache_dir)
-        task, data, col_stats_dict = get_data_custom(
-            dataset_name,
-            task_name,
-            cache_path,
-            process_bridge=process_bridge,
-            bridgeStrategy=bridge_strategy,
-            process_hub=process_hub,
-            hubStrategy=hub_strategy
-        )
+    # Load data
+    cache_path = get_cache_path(dataset_name, task_name, cache_dir)
+    task, data, col_stats_dict = get_data_custom(
+        dataset_name,
+        task_name,
+        cache_path,
+        process_bridge=process_bridge,
+        bridgeStrategy=bridge_strategy,
+        process_hub=process_hub,
+        hubStrategy=hub_strategy
+    )
 
-        if not use_ray:
-            print(f"Dataset: {dataset_name}, Task: {task_name}")
-            print(f"Entity table: {task.entity_table}")
-            print(f"Task type: {task.task_type}")
-            print(f"Node types: {data.node_types}")
-            print(f"Edge types: {data.edge_types}")
+    print(f"Dataset: {dataset_name}, Task: {task_name}")
+    print(f"Entity table: {task.entity_table}")
+    print(f"Task type: {task.task_type}")
+    print(f"Node types: {data.node_types}")
+    print(f"Edge types: {data.edge_types}")
 
-            # Check for edge attributes
-            edge_types_with_attr = []
-            for edge_type in data.edge_types:
-                if hasattr(data[edge_type], 'edge_attr'):
-                    edge_attr_shape = data[edge_type].edge_attr.shape if hasattr(data[edge_type].edge_attr, 'shape') else 'unknown'
-                    edge_types_with_attr.append((edge_type, edge_attr_shape))
-            print(f"Edge types with attributes: {edge_types_with_attr}")
+    # Check for edge attributes
+    edge_types_with_attr = []
+    for edge_type in data.edge_types:
+        if hasattr(data[edge_type], 'edge_attr'):
+            edge_attr_shape = data[edge_type].edge_attr.shape if hasattr(data[edge_type].edge_attr, 'shape') else 'unknown'
+            edge_types_with_attr.append((edge_type, edge_attr_shape))
+    print(f"Edge types with attributes: {edge_types_with_attr}")
 
     loss_fn, out_channels = get_loss(dataset_name, task_name)
     tune_metric, higher_is_better = get_tune_metric(dataset_name, task_name)
@@ -166,18 +140,43 @@ def run_training(
         )
 
     # Create model
-    model = get_model(
-        architecture=model_architecture,
-        entity_table=task.entity_table,
-        data=data,
-        col_stats_dict=col_stats_dict,
-        num_layers=num_layers,
-        channels=channels,
-        tabular_model=tabular_model,
-        out_channels=out_channels,
-        aggr=aggr,
-        norm=norm,
-    )
+    if model_architecture == "sage":
+        model = SAGEModel(
+            data=data,
+            col_stats_dict=col_stats_dict,
+            num_layers=num_layers,
+            channels=channels,
+            tabular_model=tabular_model,
+            out_channels=out_channels,
+            aggr=aggr,
+            norm=norm,
+        )
+    elif model_architecture == "dbformer":
+        model = DBFormerModel(
+            data=data,
+            col_stats_dict=col_stats_dict,
+            num_layers=num_layers,
+            channels=channels,
+            tabular_model=tabular_model,
+            out_channels=out_channels,
+            aggr=aggr,
+            norm=norm,
+            entity_table=task.entity_table,
+        )
+    elif model_architecture == "sage_edge_attr":
+        model = SAGEEdgeAttrModel(
+            data=data,
+            col_stats_dict=col_stats_dict,
+            num_layers=num_layers,
+            channels=channels,
+            tabular_model=tabular_model,
+            out_channels=out_channels,
+            aggr=aggr,
+            norm=norm,
+        )
+    else:
+        raise ValueError(f"Unknown model architecture: {model_architecture}")
+
     model = model.to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
@@ -188,8 +187,7 @@ def run_training(
         loss_accum = count_accum = 0
         steps = 0
 
-        desc = f"Training ({split})" if not use_ray else None
-        for batch in tqdm(loader, desc=desc, total=min(len(loader), max_steps_per_epoch), disable=use_ray):
+        for batch in tqdm(loader, desc=f"Training ({split})", total=min(len(loader), max_steps_per_epoch)):
             batch = batch.to(device)
 
             optimizer.zero_grad()
@@ -223,8 +221,7 @@ def run_training(
         model.eval()
 
         pred_list = []
-        desc = f"Testing ({split})" if not use_ray else None
-        for batch in tqdm(loader, desc=desc, disable=use_ray):
+        for batch in tqdm(loader, desc=f"Testing ({split})"):
             batch = batch.to(device)
             pred = model(batch, task.entity_table)
 
@@ -241,20 +238,9 @@ def run_training(
             pred_list.append(pred.detach().cpu())
         return torch.cat(pred_list, dim=0).numpy()
 
-    # Training loop
-    if not use_ray:
-        print(f"\nStarting training for {num_epochs} epochs...")
+    print(f"\nStarting training for {num_epochs} epochs...")
 
     val_table = task.get_table("val")
-    best_val_metric = -math.inf if higher_is_better else math.inf
-    training_time = 0
-
-    # Initial report for Ray
-    if use_ray:
-        ray_train.report({
-            f"val_{tune_metric}": best_val_metric,
-            f"test_{tune_metric}": best_val_metric
-        })
 
     for epoch in range(1, num_epochs + 1):
         start_time = timer()
