@@ -16,7 +16,7 @@ def to_unix_time(ser: pd.Series) -> np.ndarray:
         np.dtype("datetime64[us]"),
         np.dtype("datetime64[ms]"),
     ]
-    unix_time = ser.astype("int64").values
+    unix_time = ser.astype("int64").values.copy()
     if ser.dtype == np.dtype("datetime64[ns]"):
         unix_time //= 10**9
     elif ser.dtype == np.dtype("datetime64[us]"):
