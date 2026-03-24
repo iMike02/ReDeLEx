@@ -490,7 +490,7 @@ if __name__ == "__main__":
         "process_bridge": True,
         "bridge_strategy": "keep_table",  # "default" | "keep_attributes" | "keep_table"
         "process_hub": True,
-        "hub_strategy": "keep_attributes",       # "default_combinations" | "keep_attributes" | "keep_table"
+        "hub_strategy": "keep_table",       # "default_combinations" | "keep_attributes" | "keep_table"
     }
     
     # Parse CLI args (optional, defaults from config above)
