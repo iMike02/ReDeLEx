@@ -14,7 +14,7 @@ if torch.cuda.is_available():
     x = torch.randn(1000, 1000, device="cuda")
     y = torch.matmul(x, x)
     print(f"\nGPU compute test: OK (matmul 1000x1000)")
-    print(f"Memory after test: {torch.cuda.memory_allocated(0) / 1e6:.1f} MB")
+    # print(f"Memory after test: {torch.cuda.memory_allocated(0) / 1e6:.1f} MB")
 else:
     print("\nNo GPU detected. Check your ROCm installation.")
 

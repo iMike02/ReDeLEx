@@ -1,0 +1,213 @@
+{
+  "run_params": {
+    "dataset": "rel-f1",
+    "task": "driver-position",
+    "model_architecture": "sage_edge_attr",
+    "tabular_model": "resnet",
+    "seed": 42,
+    "lr": 0.001,
+    "min_epochs": 10,
+    "batch_size": 128,
+    "channels": 32,
+    "num_layers": 2,
+    "num_neighbors": 32,
+    "max_steps_per_epoch": 1000,
+    "min_total_steps": 1000,
+    "aggr": "sum",
+    "mlp_norm": "batch_norm",
+    "log_dir": "logs/training_logs",
+    "log_filename": "benchmark_f1.json",
+    "process_bridge": false,
+    "bridge_strategy": "default",
+    "process_hub": false,
+    "hub_strategy": "default_combinations"
+  },
+  "epoch_history": [
+    {
+      "epoch": 1,
+      "train_loss": 12.19,
+      "training_time_s": 4.718,
+      "val_metrics": {
+        "mae": 8.449,
+        "mse": 91.78,
+        "r2": -3.27
+      }
+    },
+    {
+      "epoch": 2,
+      "train_loss": 10.609,
+      "training_time_s": 8.053,
+      "val_metrics": {
+        "mae": 7.096,
+        "mse": 68.302,
+        "r2": -2.178
+      }
+    },
+    {
+      "epoch": 3,
+      "train_loss": 9.227,
+      "training_time_s": 11.637,
+      "val_metrics": {
+        "mae": 5.787,
+        "mse": 47.342,
+        "r2": -1.203
+      }
+    },
+    {
+      "epoch": 4,
+      "train_loss": 7.685,
+      "training_time_s": 15.496,
+      "val_metrics": {
+        "mae": 4.537,
+        "mse": 29.216,
+        "r2": -0.359
+      }
+    },
+    {
+      "epoch": 5,
+      "train_loss": 6.522,
+      "training_time_s": 19.351,
+      "val_metrics": {
+        "mae": 3.981,
+        "mse": 22.275,
+        "r2": -0.036
+      }
+    },
+    {
+      "epoch": 6,
+      "train_loss": 5.887,
+      "training_time_s": 23.223,
+      "val_metrics": {
+        "mae": 3.824,
+        "mse": 21.208,
+        "r2": 0.013
+      }
+    },
+    {
+      "epoch": 7,
+      "train_loss": 5.515,
+      "training_time_s": 27.11,
+      "val_metrics": {
+        "mae": 3.469,
+        "mse": 18.489,
+        "r2": 0.14
+      }
+    },
+    {
+      "epoch": 8,
+      "train_loss": 5.245,
+      "training_time_s": 30.976,
+      "val_metrics": {
+        "mae": 3.297,
+        "mse": 16.69,
+        "r2": 0.223
+      }
+    },
+    {
+      "epoch": 9,
+      "train_loss": 5.061,
+      "training_time_s": 34.836,
+      "val_metrics": {
+        "mae": 3.307,
+        "mse": 16.818,
+        "r2": 0.218
+      }
+    },
+    {
+      "epoch": 10,
+      "train_loss": 4.916,
+      "training_time_s": 38.711,
+      "val_metrics": {
+        "mae": 3.23,
+        "mse": 16.184,
+        "r2": 0.247
+      }
+    },
+    {
+      "epoch": 11,
+      "train_loss": 4.816,
+      "training_time_s": 42.655,
+      "val_metrics": {
+        "mae": 3.177,
+        "mse": 15.885,
+        "r2": 0.261
+      }
+    },
+    {
+      "epoch": 12,
+      "train_loss": 4.758,
+      "training_time_s": 46.554,
+      "val_metrics": {
+        "mae": 3.118,
+        "mse": 15.536,
+        "r2": 0.277
+      }
+    },
+    {
+      "epoch": 13,
+      "train_loss": 4.684,
+      "training_time_s": 50.412,
+      "val_metrics": {
+        "mae": 3.15,
+        "mse": 15.772,
+        "r2": 0.266
+      }
+    },
+    {
+      "epoch": 14,
+      "train_loss": 4.623,
+      "training_time_s": 54.289,
+      "val_metrics": {
+        "mae": 3.169,
+        "mse": 15.736,
+        "r2": 0.268
+      }
+    },
+    {
+      "epoch": 15,
+      "train_loss": 4.536,
+      "training_time_s": 58.182,
+      "val_metrics": {
+        "mae": 3.199,
+        "mse": 16.253,
+        "r2": 0.244
+      }
+    },
+    {
+      "epoch": 16,
+      "train_loss": 4.459,
+      "training_time_s": 62.054,
+      "val_metrics": {
+        "mae": 3.398,
+        "mse": 18.517,
+        "r2": 0.138
+      }
+    },
+    {
+      "epoch": 17,
+      "train_loss": 4.408,
+      "training_time_s": 65.913,
+      "val_metrics": {
+        "mae": 3.151,
+        "mse": 15.44,
+        "r2": 0.282
+      }
+    }
+  ],
+  "summary": {
+    "best_epoch": 12,
+    "best_val_metric_name": "mae",
+    "best_val_metric_value": 3.118,
+    "best_val_metrics": {
+      "mae": 3.118,
+      "mse": 15.536,
+      "r2": 0.277
+    },
+    "best_test_metrics": {
+      "mae": 3.456,
+      "mse": 18.046,
+      "r2": 0.335
+    },
+    "total_training_time_s": 65.913
+  }
+}

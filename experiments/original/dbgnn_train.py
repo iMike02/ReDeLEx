@@ -471,26 +471,26 @@ if __name__ == "__main__":
         "tabular_model": "resnet",          # "resnet" | "linear"
         "seed": 42,
         "lr": 0.001,
-        "min_epochs": 3,
-        "batch_size": 32,
-        "channels": 32,
+        "min_epochs": 10,
+        "batch_size": 128,
+        "channels": 64,
         "num_layers": 2,
-        "num_neighbors": 16,
-        "max_steps_per_epoch": 10,
-        "min_total_steps": 10,
+        "num_neighbors": 32,
+        "max_steps_per_epoch": 1000,
+        "min_total_steps": 1000,
         "aggr": "sum",
         "mlp_norm": "batch_norm",
 
         "cache_dir": ".cache",
         "log_dir": "logs/training_logs",
-        "log_filename": "default_f1.json",
-        "toggle_logging": True,
+        "log_filename": "benchmark_f1.json",
+        "toggle_logging": False,
         "summary_csv_path": "logs/training_logs/run_summary_rel_f1.csv",
         "toggle_summary_csv": True,
-        "process_bridge": False,
-        "bridge_strategy": "default",  # "default" | "keep_attributes" | "keep_table"
-        "process_hub": False,
-        "hub_strategy": "default_combinations",       # "default_combinations" | "keep_attributes" | "keep_table"
+        "process_bridge": True,
+        "bridge_strategy": "keep_table",  # "default" | "keep_attributes" | "keep_table"
+        "process_hub": True,
+        "hub_strategy": "keep_attributes",       # "default_combinations" | "keep_attributes" | "keep_table"
     }
     
     # Parse CLI args (optional, defaults from config above)

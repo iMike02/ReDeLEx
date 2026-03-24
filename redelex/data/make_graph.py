@@ -108,7 +108,9 @@ class MakeGraph:
         if len(tensor_list) == 0:
             return None
 
-        return torch.cat(tensor_list, dim=-1)
+        edge_attr = torch.cat(tensor_list, dim=-1)
+        edge_attr = torch.nan_to_num(edge_attr, nan=0.0, posinf=0.0, neginf=0.0)
+        return edge_attr
     
     def __create_edge(self, table_1, table_2, df, table_name: str, dataset: Dataset, with_edge_attr: bool):
         fkey_name, pkey_table_name = table_1
