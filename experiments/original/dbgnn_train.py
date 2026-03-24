@@ -1,5 +1,7 @@
-from typing import Dict, Literal, cast
+from typing import Dict, Literal, Optional, cast
 
+import csv
+import json
 import math
 import os
 import random
@@ -44,6 +46,142 @@ def get_model(architecture: Literal["sage", "dbformer", "sage_edge_attr"], entit
     raise ValueError(f"Unknown architecture: {architecture}")
 
 
+def print_heterodata_readable(data) -> None:
+    print("\n=== HeteroData (readable) ===")
+    print(data)
+
+    # print("\nEdge stores:")
+    # for edge_type in data.edge_types:
+    #     store = data[edge_type]
+    #     edge_index = getattr(store, "edge_index", None)
+    #     num_edges = edge_index.size(1) if edge_index is not None else "N/A"
+    #     print(f"  - {edge_type}: num_edges={num_edges}")
+
+    #     edge_attr = getattr(store, "edge_attr", None)
+    #     if torch.is_tensor(edge_attr):
+    #         ea = cast(torch.Tensor, edge_attr)
+    #         ea_f = ea.float()
+    #         nan_count = int(torch.isnan(ea_f).sum())
+    #         zero_rows = int((ea_f.abs().sum(dim=-1) == 0).sum())
+    #         print(
+    #             f"    edge_attr: shape={tuple(ea.shape)}, dtype={ea.dtype} | "
+    #             f"min={ea_f.min():.4f}, max={ea_f.max():.4f}, mean={ea_f.mean():.4f} | "
+    #             f"NaNs={nan_count}, all-zero rows={zero_rows}/{ea.size(0)}"
+    #         )
+    #     else:
+    #         print("    edge_attr: none")
+
+    print("=== End HeteroData ===\n")
+
+
+def round_floats(value: object) -> object:
+    if isinstance(value, float):
+        return round(value, 3)
+    if isinstance(value, dict):
+        return {k: round_floats(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [round_floats(v) for v in value]
+    return value
+
+
+def init_training_log(log_path: str, run_params: Dict[str, object]) -> None:
+    os.makedirs(os.path.dirname(log_path), exist_ok=True)
+    payload = {
+        "run_params": run_params,
+        "epoch_history": [],
+        "summary": {},
+    }
+    with open(log_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2)
+
+
+def append_epoch_log(
+    log_path: str,
+    epoch: int,
+    train_loss: float,
+    training_time_s: float,
+    val_metrics: Dict[str, float],
+) -> None:
+    with open(log_path, "r", encoding="utf-8") as f:
+        payload = json.load(f)
+
+    payload["epoch_history"].append(
+        round_floats(
+            {
+            "epoch": epoch,
+            "train_loss": float(train_loss),
+            "training_time_s": float(training_time_s),
+            "val_metrics": {k: float(v) for k, v in val_metrics.items()},
+            }
+        )
+    )
+
+    with open(log_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2)
+
+
+def finalize_training_log(
+    log_path: str,
+    best_epoch: int,
+    best_val_metric_name: str,
+    best_val_metric_value: float,
+    best_val_metrics: Dict[str, float],
+    best_test_metrics: Dict[str, float],
+    total_training_time_s: float,
+) -> None:
+    with open(log_path, "r", encoding="utf-8") as f:
+        payload = json.load(f)
+
+    payload["summary"] = round_floats({
+        "best_epoch": int(best_epoch),
+        "best_val_metric_name": best_val_metric_name,
+        "best_val_metric_value": float(best_val_metric_value),
+        "best_val_metrics": {k: float(v) for k, v in best_val_metrics.items()},
+        "best_test_metrics": {k: float(v) for k, v in best_test_metrics.items()},
+        "total_training_time_s": float(total_training_time_s),
+    })
+
+    with open(log_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2)
+
+
+def append_run_summary_csv(csv_path: str, row: Dict[str, object]) -> None:
+    csv_dir = os.path.dirname(csv_path)
+    if csv_dir:
+        os.makedirs(csv_dir, exist_ok=True)
+    normalized_row = cast(Dict[str, object], round_floats(row))
+
+    existing_rows: list[Dict[str, str]] = []
+    fieldnames: list[str] = list(normalized_row.keys())
+
+    if os.path.exists(csv_path):
+        with open(csv_path, "r", encoding="utf-8", newline="") as f:
+            reader = csv.DictReader(f)
+            existing_rows = list(reader)
+            if reader.fieldnames is not None:
+                fieldnames = list(reader.fieldnames)
+                for key in normalized_row.keys():
+                    if key not in fieldnames:
+                        fieldnames.append(key)
+
+    row_to_write = {key: "" for key in fieldnames}
+    row_to_write.update({key: str(value) for key, value in normalized_row.items()})
+
+    if existing_rows:
+        with open(csv_path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            for existing in existing_rows:
+                merged_existing = {key: existing.get(key, "") for key in fieldnames}
+                writer.writerow(merged_existing)
+            writer.writerow(row_to_write)
+    else:
+        with open(csv_path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerow(row_to_write)
+
+
 def run_training(
     dataset_name: str,
     task_name: str,
@@ -61,6 +199,11 @@ def run_training(
     aggr: str = "sum",
     mlp_norm: str = "batch_norm",
     cache_dir: str = ".cache",
+    log_dir: str = "logs/training_logs",
+    log_filename: Optional[str] = None,
+    toggle_logging: bool = False,
+    summary_csv_path: str = "logs/training_logs/run_summary.csv",
+    toggle_summary_csv: bool = True,
     process_bridge: bool = False,
     bridge_strategy: str = "default",
     process_hub: bool = False,
@@ -85,6 +228,9 @@ def run_training(
         process_hub=process_hub,
         hubStrategy=hub_strategy,
     )
+    # TEST print - comment if not needed
+    # print_heterodata_readable(data)
+    
     entity_table = cast(str, getattr(task, "entity_table"))
 
     loss_fn, out_channels = get_loss(dataset_name, task_name)
@@ -199,6 +345,40 @@ def run_training(
         f"epochs={n_epochs} batch={batch_size} neighbors={num_neighbors}"
     )
 
+    run_params: Dict[str, object] = {
+        "dataset": dataset_name,
+        "task": task_name,
+        "model_architecture": model_architecture,
+        "tabular_model": tabular_model,
+        "seed": seed,
+        "lr": lr,
+        "min_epochs": min_epochs,
+        "batch_size": batch_size,
+        "channels": channels,
+        "num_layers": num_layers,
+        "num_neighbors": num_neighbors,
+        "max_steps_per_epoch": max_steps_per_epoch,
+        "min_total_steps": min_total_steps,
+        "aggr": aggr,
+        "mlp_norm": mlp_norm,
+        "log_dir": log_dir,
+        "log_filename": log_filename,
+        "process_bridge": process_bridge,
+        "bridge_strategy": bridge_strategy,
+        "process_hub": process_hub,
+        "hub_strategy": hub_strategy,
+    }
+
+    filename = (log_filename or "").strip()
+    if filename == "":
+        filename = f"{dataset_name}_{task_name}_{model_architecture}_seed{seed}.json"
+    elif not filename.endswith(".json"):
+        filename = f"{filename}.json"
+
+    log_path = os.path.join(log_dir, filename)
+    if toggle_logging:
+        init_training_log(log_path, run_params)
+
     val_table = task.get_table("val")
     training_time = 0.0
 
@@ -214,6 +394,8 @@ def run_training(
 
         val_pred = evaluate("val")
         val_metrics = task.evaluate(val_pred, val_table, metrics=metrics)
+        if toggle_logging:
+            append_epoch_log(log_path, epoch, train_loss, training_time, val_metrics)
 
         current = val_metrics[tune_metric]
         improved = (higher_is_better and current >= best_val_metric) or (
@@ -237,9 +419,43 @@ def run_training(
     print("Best validation metrics:", best_val_metrics)
     print("Best corresponding test metrics:", best_test_metrics)
 
+    if toggle_logging:
+        finalize_training_log(
+            log_path=log_path,
+            best_epoch=best_epoch,
+            best_val_metric_name=tune_metric,
+            best_val_metric_value=best_val_metric,
+            best_val_metrics=best_val_metrics,
+            best_test_metrics=best_test_metrics,
+            total_training_time_s=training_time,
+        )
+        print(f"Saved training log to: {log_path}")
+
+    if toggle_summary_csv:
+        summary_row: Dict[str, object] = {
+            "dataset": dataset_name,
+            "task": task_name,
+            "model": model_architecture,
+            "tabular_model": tabular_model,
+            "seed": seed,
+            "process_bridge": process_bridge,
+            "bridge_strategy": bridge_strategy,
+            "process_hub": process_hub,
+            "hub_strategy": hub_strategy,
+            "best_epoch": best_epoch,
+            "training_time_s": float(training_time),
+            **{f"best_val_{k}": float(v) for k, v in best_val_metrics.items()},
+            **{f"best_test_{k}": float(v) for k, v in best_test_metrics.items()},
+        }
+        append_run_summary_csv(summary_csv_path, summary_row)
+        print(f"Appended run summary to: {os.path.abspath(summary_csv_path)}")
+    else:
+        print("Summary CSV logging disabled (toggle_summary_csv=False).")
+
     result = {
         "best_epoch": float(best_epoch),
         "best_val_metric": float(best_val_metric),
+        "training_time_s": float(training_time),
         **{f"best_val_{k}": v for k, v in best_val_metrics.items()},
         **{f"best_test_{k}": v for k, v in best_test_metrics.items()},
     }
@@ -251,8 +467,8 @@ if __name__ == "__main__":
     config = {
         "dataset": "rel-f1",
         "task": "driver-position",
-        "model": "sage_edge_attr",
-        "tabular_model": "resnet",
+        "model": "sage_edge_attr",          # "sage" | "dbformer" | "sage_edge_attr"
+        "tabular_model": "resnet",          # "resnet" | "linear"
         "seed": 42,
         "lr": 0.001,
         "min_epochs": 3,
@@ -264,11 +480,17 @@ if __name__ == "__main__":
         "min_total_steps": 10,
         "aggr": "sum",
         "mlp_norm": "batch_norm",
+
         "cache_dir": ".cache",
-        "process_bridge": True,
-        "bridge_strategy": "keep_attributes",
-        "process_hub": True,
-        "hub_strategy": "keep_table",
+        "log_dir": "logs/training_logs",
+        "log_filename": "default_f1.json",
+        "toggle_logging": True,
+        "summary_csv_path": "logs/training_logs/run_summary_rel_f1.csv",
+        "toggle_summary_csv": True,
+        "process_bridge": False,
+        "bridge_strategy": "default",  # "default" | "keep_attributes" | "keep_table"
+        "process_hub": False,
+        "hub_strategy": "default_combinations",       # "default_combinations" | "keep_attributes" | "keep_table"
     }
     
     # Parse CLI args (optional, defaults from config above)
@@ -288,7 +510,16 @@ if __name__ == "__main__":
     parser.add_argument("--min_total_steps", type=int, default=config["min_total_steps"])
     parser.add_argument("--aggr", choices=["sum", "mean", "max"], default=config["aggr"])
     parser.add_argument("--mlp_norm", choices=["batch_norm", "layer_norm"], default=config["mlp_norm"])
+
     parser.add_argument("--cache_dir", type=str, default=config["cache_dir"])
+    parser.add_argument("--log_dir", type=str, default=config["log_dir"])
+    parser.add_argument("--log_filename", type=str, default=config["log_filename"])
+    parser.add_argument("--toggle_logging", action="store_true", default=config["toggle_logging"])
+    parser.add_argument("--no_toggle_logging", action="store_false", dest="toggle_logging")
+    parser.add_argument("--summary_csv_path", type=str, default=config["summary_csv_path"])
+    parser.add_argument("--toggle_summary_csv", action="store_true", default=config["toggle_summary_csv"])
+    parser.add_argument("--no_toggle_summary_csv", action="store_false", dest="toggle_summary_csv")
+
     parser.add_argument("--process_bridge", action="store_true", default=config["process_bridge"])
     parser.add_argument("--bridge_strategy", type=str, default=config["bridge_strategy"])
     parser.add_argument("--process_hub", action="store_true", default=config["process_hub"])
@@ -318,6 +549,11 @@ if __name__ == "__main__":
             aggr=args.aggr,
             mlp_norm=args.mlp_norm,
             cache_dir=args.cache_dir,
+            log_dir=args.log_dir,
+            log_filename=args.log_filename,
+            toggle_logging=args.toggle_logging,
+            summary_csv_path=args.summary_csv_path,
+            toggle_summary_csv=args.toggle_summary_csv,
             process_bridge=args.process_bridge,
             bridge_strategy=args.bridge_strategy,
             process_hub=args.process_hub,

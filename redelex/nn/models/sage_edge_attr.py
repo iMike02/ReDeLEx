@@ -38,6 +38,7 @@ class EdgeAttrSAGEConv(MessagePassing):
         edge_dim: Optional[int] = None,
         aggr: str = "mean",
         normalize: bool = False,
+        bias: bool = True,
         **kwargs,
     ):
         super().__init__(aggr=aggr, **kwargs)
@@ -48,12 +49,13 @@ class EdgeAttrSAGEConv(MessagePassing):
         self.normalize = normalize
         
         # Standard SAGE transformation
-        self.lin_l = torch.nn.Linear(in_channels, out_channels, bias=False)
+        self.lin_l = torch.nn.Linear(in_channels, out_channels, bias=bias)
         self.lin_r = torch.nn.Linear(in_channels, out_channels, bias=False)
         
         # Edge attribute transformation (if edge features are present)
+        # in_channels because edge_attr is transformed before being added to the message, so it needs to match the message dimension
         if edge_dim is not None:
-            self.lin_edge = torch.nn.Linear(edge_dim, out_channels, bias=False)
+            self.lin_edge = torch.nn.Linear(edge_dim, in_channels, bias=False)
         else:
             self.lin_edge = None
             
@@ -74,12 +76,12 @@ class EdgeAttrSAGEConv(MessagePassing):
         # x can be Tensor [N, in_channels] or tuple (x_src, x_dst) for bipartite graphs
         # edge_attr has shape [E, edge_dim] if provided
         
-        # Extract destination nodes (for bipartite: x[1], otherwise: x)
-        x_dst = x[1] if isinstance(x, tuple) else x
-        
         out = self.propagate(edge_index, x=x, edge_attr=edge_attr)
         out = self.lin_l(out)
         
+        # Extract destination nodes (for bipartite: x[1], otherwise: x) (x_dst ~ x_r)
+        x_dst = x[1] if isinstance(x, tuple) else x
+
         # Add self-connection
         if x_dst.size(-1) == self.in_channels:
             out = out + self.lin_r(x_dst)
@@ -94,9 +96,9 @@ class EdgeAttrSAGEConv(MessagePassing):
         # edge_attr has shape [E, edge_dim] if provided
         
         if edge_attr is not None and self.lin_edge is not None:
-            # Incorporate edge features: multiply neighbor features by edge transformation
+            # Incorporate edge features: Add information from edge attributes to the message
             edge_features = self.lin_edge(edge_attr)
-            return x_j * torch.sigmoid(edge_features)
+            return x_j + edge_features
         else:
             return x_j
 
@@ -202,6 +204,9 @@ class SAGEEdgeAttrModel(torch.nn.Module):
         edge_dim_dict: Optional[Dict[EdgeType, int]] = None,
     ):
         super().__init__()
+
+        if edge_dim_dict is None:
+            edge_dim_dict = self._derive_edge_dim_dict(data)
         
         def get_tabular_model(tabular_model: str):
             if tabular_model == "resnet":
@@ -248,6 +253,17 @@ class SAGEEdgeAttrModel(torch.nn.Module):
         )
         
         self.reset_parameters()
+
+    @staticmethod
+    def _derive_edge_dim_dict(data: HeteroData) -> Dict[EdgeType, int]:
+        edge_dim_dict: Dict[EdgeType, int] = {}
+        for edge_type in data.edge_types:
+            edge_attr = getattr(data[edge_type], "edge_attr", None)
+            if torch.is_tensor(edge_attr):
+                tensor_edge_attr = edge_attr
+                if tensor_edge_attr.dim() >= 2:
+                    edge_dim_dict[edge_type] = int(tensor_edge_attr.size(-1))
+        return edge_dim_dict
     
     def reset_parameters(self):
         self.encoder.reset_parameters()

@@ -76,11 +76,39 @@ class MakeGraph:
         path = None if self.cache_dir is None else os.path.join(self.cache_dir, f"{table_name}.pt")
 
         dataset = Dataset(
-            df=table.df,
+            df=df,
             col_to_stype=col_to_stype,
             col_to_text_embedder_cfg=self.text_embedder_cfg,
         ).materialize(path=path)
         return dataset
+
+    def __tensor_frame_to_edge_attr(self, tensor_frame: Any) -> Optional[Tensor]:
+        feat_dict = getattr(tensor_frame, "feat_dict", None)
+        if feat_dict is None:
+            return None
+
+        tensor_list = []
+        for _, feat in sorted(feat_dict.items(), key=lambda item: str(item[0])):
+            if isinstance(feat, Tensor):
+                values = feat
+            else:
+                feat_values = getattr(feat, "values", None)
+                values = feat_values if isinstance(feat_values, Tensor) else None
+
+            if values is None:
+                continue
+
+            if values.dim() == 1:
+                values = values.unsqueeze(-1)
+            elif values.dim() > 2:
+                values = values.reshape(values.size(0), -1)
+
+            tensor_list.append(values.float())
+
+        if len(tensor_list) == 0:
+            return None
+
+        return torch.cat(tensor_list, dim=-1)
     
     def __create_edge(self, table_1, table_2, df, table_name: str, dataset: Dataset, with_edge_attr: bool):
         fkey_name, pkey_table_name = table_1
@@ -112,10 +140,11 @@ class MakeGraph:
         # Adds edge attributes instead of throwing data away
         if with_edge_attr:
             tf = dataset.tensor_frame[torch.from_numpy(mask.values)]
-            assert tf.num_rows == edge_index_1.size(1)
-            
-            self.data[edge_type_1].edge_attr = tf
-            self.data[edge_type_2].edge_attr = tf
+            edge_attr = self.__tensor_frame_to_edge_attr(tf)
+            if edge_attr is not None:
+                assert edge_attr.size(0) == edge_index_1.size(1)
+                self.data[edge_type_1].edge_attr = edge_attr
+                self.data[edge_type_2].edge_attr = edge_attr
 
     def pkey_fkey_structure_to_graph(self, df, table_name: str, table: Table, dataset: Dataset):     # Default method to create graph with pkey-fkey edges
         # Add table node features:
