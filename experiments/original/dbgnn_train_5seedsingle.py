@@ -163,7 +163,17 @@ def save_aggregated_summary_csv(
     seed_results: list,
 ) -> None:
     """Save one aggregated row (mean/var per metric) across all seeds."""
-    aggregate = build_aggregate_stats(seed_results)
+    best_epochs = [int(r["best_epoch"]) for r in seed_results]
+    train_times = np.array([r["training_time_s"] for r in seed_results], dtype=float)
+
+    metric_keys = sorted({k for r in seed_results for k in r.keys()
+                          if k.startswith("best_val_") or k.startswith("best_test_")})
+
+    metric_stats: Dict[str, object] = {}
+    for key in metric_keys:
+        values = np.array([r[key] for r in seed_results if key in r], dtype=float)
+        metric_stats[f"{key}_mean"] = round(float(np.mean(values)), 4)
+        metric_stats[f"{key}_var"] = round(float(np.var(values)), 6)
 
     row: Dict[str, object] = {
         "seeds": str(seeds),
@@ -171,219 +181,26 @@ def save_aggregated_summary_csv(
         "bridge_strategy": bridge_strategy,
         "process_hub": process_hub,
         "hub_strategy": hub_strategy,
-        **aggregate,
+        "best_epochs": str(best_epochs),
+        "avg_training_time_s": round(float(np.mean(train_times)), 3),
+        **metric_stats,
     }
     append_run_summary_csv(csv_path, row)
     print(f"Saved aggregated summary to: {os.path.abspath(csv_path)}")
 
 
-def build_aggregate_stats(seed_results: list) -> Dict[str, object]:
-    best_epochs = [int(r["best_epoch"]) for r in seed_results]
-    train_times = np.array([r["training_time_s"] for r in seed_results], dtype=float)
+def get_seed_log_filename(log_filename: Optional[str], seed: int) -> Optional[str]:
+    if log_filename is None:
+        return None
 
-    metric_keys = sorted(
-        {
-            k
-            for r in seed_results
-            for k in r.keys()
-            if k.startswith("best_val_") or k.startswith("best_test_")
-        }
-    )
+    stripped = log_filename.strip()
+    if stripped == "":
+        return None
 
-    stats: Dict[str, object] = {
-        "best_epochs": str(best_epochs),
-        "avg_training_time_s": round(float(np.mean(train_times)), 3),
-    }
-
-    for key in metric_keys:
-        values = np.array([r[key] for r in seed_results if key in r], dtype=float)
-        stats[f"{key}_mean"] = round(float(np.mean(values)), 4)
-        stats[f"{key}_var"] = round(float(np.var(values)), 6)
-
-    return stats
-
-
-def save_multi_seed_log_json(
-    json_path: str,
-    run_params: Dict[str, object],
-    seed_results: list,
-) -> None:
-    os.makedirs(os.path.dirname(json_path), exist_ok=True)
-    payload: Dict[str, object] = {
-        "run_params": run_params,
-        "seed_runs": [
-            {
-                "seed": int(r["seed"]),
-                "epoch_history": r.get("epoch_history", []),
-                "summary": r.get("summary", {}),
-            }
-            for r in seed_results
-        ],
-        "aggregate": build_aggregate_stats(seed_results),
-    }
-    with open(json_path, "w", encoding="utf-8") as f:
-        json.dump(round_floats(payload), f, indent=2)
-    print(f"Saved multi-seed log to: {os.path.abspath(json_path)}")
-
-
-def save_sweep_manifest(
-    sweep_dir: str,
-    run_params: Dict[str, object],
-) -> str:
-    os.makedirs(sweep_dir, exist_ok=True)
-    manifest_path = os.path.join(sweep_dir, "configs.json")
-    manifest: Dict[str, object]
-
-    if os.path.exists(manifest_path):
-        with open(manifest_path, "r", encoding="utf-8") as f:
-            manifest = cast(Dict[str, object], json.load(f))
-    else:
-        manifest = {"configs": {}}
-
-    # Normalize to cfg_N entries with only strategy-specific params.
-    raw_configs = cast(Dict[str, Any], manifest.get("configs", {}))
-    normalized_configs: Dict[str, Dict[str, object]] = {}
-    for idx, cfg in enumerate(raw_configs.values(), start=1):
-        cfg_id = f"cfg_{idx}"
-        cfg_dict = cast(Dict[str, Any], cfg) if isinstance(cfg, dict) else {}
-        normalized_configs[cfg_id] = {
-            "json_file": f"{cfg_id}.json",
-            "process_bridge": bool(cfg_dict.get("process_bridge", False)),
-            "bridge_strategy": str(cfg_dict.get("bridge_strategy", "default")),
-            "process_hub": bool(cfg_dict.get("process_hub", False)),
-            "hub_strategy": str(cfg_dict.get("hub_strategy", "default_combinations")),
-        }
-    manifest["configs"] = normalized_configs
-
-    # Shared parameters for the whole sweep are stored once at the top-level.
-    shared_keys = [
-        "dataset",
-        "task",
-        "model_architecture",
-        "tabular_model",
-        "seeds",
-        "lr",
-        "min_epochs",
-        "batch_size",
-        "channels",
-        "num_layers",
-        "num_neighbors",
-        "max_steps_per_epoch",
-        "min_total_steps",
-        "aggr",
-        "mlp_norm",
-    ]
-    for key in shared_keys:
-        manifest[key] = run_params[key]
-
-    manifest_configs = cast(Dict[str, Dict[str, object]], manifest.setdefault("configs", {}))
-
-    # Reuse existing cfg_N if strategy combo already exists; otherwise create a new one.
-    config_id: Optional[str] = None
-    for existing_id, cfg in manifest_configs.items():
-        if (
-            cfg.get("process_bridge") == run_params["process_bridge"]
-            and cfg.get("bridge_strategy") == run_params["bridge_strategy"]
-            and cfg.get("process_hub") == run_params["process_hub"]
-            and cfg.get("hub_strategy") == run_params["hub_strategy"]
-        ):
-            config_id = existing_id
-            break
-
-    if config_id is None:
-        cfg_numbers = [
-            int(k.split("_")[1])
-            for k in manifest_configs.keys()
-            if isinstance(k, str) and k.startswith("cfg_") and k.split("_")[1].isdigit()
-        ]
-        next_idx = max(cfg_numbers) + 1 if len(cfg_numbers) > 0 else 1
-        config_id = f"cfg_{next_idx}"
-
-    manifest_configs[config_id] = {
-        "json_file": f"{config_id}.json",
-        "process_bridge": run_params["process_bridge"],
-        "bridge_strategy": run_params["bridge_strategy"],
-        "process_hub": run_params["process_hub"],
-        "hub_strategy": run_params["hub_strategy"],
-    }
-
-    with open(manifest_path, "w", encoding="utf-8") as f:
-        json.dump(round_floats(manifest), f, indent=2)
-
-    print(f"Updated sweep manifest: {os.path.abspath(manifest_path)}")
-    return cast(str, config_id)
-
-
-def build_strategy_run_configs(
-    run_all_configs: bool,
-    process_bridge: bool,
-    bridge_strategy: str,
-    process_hub: bool,
-    hub_strategy: str,
-    bridge_strategy_options: list[str],
-    hub_strategy_options: list[str],
-) -> list[Dict[str, object]]:
-    if not run_all_configs:
-        return [
-            {
-                "process_bridge": process_bridge,
-                "bridge_strategy": bridge_strategy,
-                "process_hub": process_hub,
-                "hub_strategy": hub_strategy,
-            }
-        ]
-
-    # Keep option order stable while removing accidental duplicates.
-    unique_bridge_strategies = list(dict.fromkeys(bridge_strategy_options))
-    unique_hub_strategies = list(dict.fromkeys(hub_strategy_options))
-
-    run_configs: list[Dict[str, object]] = []
-
-    # 1) Default baseline: no bridge/hub processing.
-    run_configs.append(
-        {
-            "process_bridge": False,
-            "bridge_strategy": "default",
-            "process_hub": False,
-            "hub_strategy": "default_combinations",
-        }
-    )
-
-    # 2) Hub-only runs: process_hub=True, process_bridge=False.
-    for hub_opt in unique_hub_strategies:
-        run_configs.append(
-            {
-                "process_bridge": False,
-                "bridge_strategy": "default",
-                "process_hub": True,
-                "hub_strategy": hub_opt,
-            }
-        )
-
-    # 3) Bridge-only runs: process_bridge=True, process_hub=False.
-    for bridge_opt in unique_bridge_strategies:
-        run_configs.append(
-            {
-                "process_bridge": True,
-                "bridge_strategy": bridge_opt,
-                "process_hub": False,
-                "hub_strategy": "default_combinations",
-            }
-        )
-
-    # 4) Full combinations: process_bridge=True and process_hub=True.
-    for bridge_opt in unique_bridge_strategies:
-        for hub_opt in unique_hub_strategies:
-            run_configs.append(
-                {
-                    "process_bridge": True,
-                    "bridge_strategy": bridge_opt,
-                    "process_hub": True,
-                    "hub_strategy": hub_opt,
-                }
-            )
-
-    return run_configs
+    base, ext = os.path.splitext(stripped)
+    if ext == "":
+        ext = ".json"
+    return f"{base}_seed{seed}{ext}"
 
 
 def build_training_data(
@@ -430,12 +247,14 @@ def run_training(
     aggr: str = "sum",
     mlp_norm: str = "batch_norm",
     cache_dir: str = ".cache",
+    log_dir: str = "logs/training_logs",
+    log_filename: Optional[str] = None,
     toggle_logging: bool = False,
     process_bridge: bool = False,
     bridge_strategy: str = "default",
     process_hub: bool = False,
     hub_strategy: str = "default_combinations",
-) -> Dict[str, Any]:
+) -> Dict[str, float]:
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -557,7 +376,39 @@ def run_training(
         f"epochs={n_epochs} batch={batch_size} neighbors={num_neighbors}"
     )
 
-    epoch_history: list[Dict[str, object]] = []
+    run_params: Dict[str, object] = {
+        "dataset": dataset_name,
+        "task": task_name,
+        "model_architecture": model_architecture,
+        "tabular_model": tabular_model,
+        "seed": seed,
+        "lr": lr,
+        "min_epochs": min_epochs,
+        "batch_size": batch_size,
+        "channels": channels,
+        "num_layers": num_layers,
+        "num_neighbors": num_neighbors,
+        "max_steps_per_epoch": max_steps_per_epoch,
+        "min_total_steps": min_total_steps,
+        "aggr": aggr,
+        "mlp_norm": mlp_norm,
+        "log_dir": log_dir,
+        "log_filename": log_filename,
+        "process_bridge": process_bridge,
+        "bridge_strategy": bridge_strategy,
+        "process_hub": process_hub,
+        "hub_strategy": hub_strategy,
+    }
+
+    filename = (log_filename or "").strip()
+    if filename == "":
+        filename = f"{dataset_name}_{task_name}_{model_architecture}_seed{seed}.json"
+    elif not filename.endswith(".json"):
+        filename = f"{filename}.json"
+
+    log_path = os.path.join(log_dir, filename)
+    if toggle_logging:
+        init_training_log(log_path, run_params)
 
     val_table = task.get_table("val")
     training_time = 0.0
@@ -585,20 +436,7 @@ def run_training(
             test_pred = evaluate("test")
             test_metrics = task.evaluate(test_pred, metrics=metrics)
             epoch_test_metrics = {k: float(v) for k, v in test_metrics.items()}
-            epoch_history.append(
-                cast(
-                    Dict[str, object],
-                    round_floats(
-                        {
-                            "epoch": epoch,
-                            "train_loss": float(train_loss),
-                            "training_time_s": float(training_time),
-                            "val_metrics": {k: float(v) for k, v in val_metrics.items()},
-                            "test_metrics": epoch_test_metrics,
-                        }
-                    ),
-                )
-            )
+            append_epoch_log(log_path, epoch, train_loss, training_time, val_metrics, epoch_test_metrics)
 
         if improved:
             best_val_metric = current
@@ -619,26 +457,21 @@ def run_training(
     print("Best validation metrics:", best_val_metrics)
     print("Best corresponding test metrics:", best_test_metrics)
 
-    summary_payload: Dict[str, object] = cast(
-        Dict[str, object],
-        round_floats(
-            {
-                "best_epoch": int(best_epoch),
-                "best_val_metric_name": tune_metric,
-                "best_val_metric_value": float(best_val_metric),
-                "best_val_metrics": {k: float(v) for k, v in best_val_metrics.items()},
-                "best_test_metrics": {k: float(v) for k, v in best_test_metrics.items()},
-                "total_training_time_s": float(training_time),
-            }
-        ),
-    )
+    if toggle_logging:
+        finalize_training_log(
+            log_path=log_path,
+            best_epoch=best_epoch,
+            best_val_metric_name=tune_metric,
+            best_val_metric_value=best_val_metric,
+            best_val_metrics=best_val_metrics,
+            best_test_metrics=best_test_metrics,
+            total_training_time_s=training_time,
+        )
+        print(f"Saved training log to: {log_path}")
 
     result = {
-        "seed": int(seed),
         "best_epoch": float(best_epoch),
         "training_time_s": float(training_time),
-        "epoch_history": epoch_history,
-        "summary": summary_payload,
         **{f"best_val_{k}": v for k, v in best_val_metrics.items()},
         **{f"best_test_{k}": v for k, v in best_test_metrics.items()},
     }
@@ -655,28 +488,26 @@ if __name__ == "__main__":
         "seed": 42,
         "seeds": [42, 43, 44, 45, 46],
         "lr": 0.001,            #
-        "min_epochs": 2,       # 10
-        "batch_size": 16,      # 128
+        "min_epochs": 3,       # 10
+        "batch_size": 32,      # 128
         "channels": 32,         # 64
         "num_layers": 2,        # 2
-        "num_neighbors": 16,            # 32
-        "max_steps_per_epoch": 5,    # 1000
-        "min_total_steps": 2,        # 1000
+        "num_neighbors": 32,            # 32
+        "max_steps_per_epoch": 10,    # 1000
+        "min_total_steps": 5,        # 1000
         "aggr": "sum",
         "mlp_norm": "batch_norm",
 
         "cache_dir": ".cache",
         "log_dir": "logs/training_logs",
-        "toggle_logging": True,
+        "log_filename": "testing001.json",
+        "toggle_logging": False,
+        "summary_csv_path": "logs/training_logs",   # potentially useless now
         "toggle_summary_csv": True,
-        "run_all_configs": True,
-
         "process_bridge": False,
         "bridge_strategy": "default",  # "default" | "keep_attributes" | "keep_table"
         "process_hub": False,
         "hub_strategy": "default_combinations",       # "default_combinations" | "keep_attributes" | "keep_table"
-        "bridge_strategy_options": ["default", "keep_attributes", "keep_table"],
-        "hub_strategy_options": ["default_combinations", "keep_attributes", "keep_table"],
     }
     
     # Parse CLI args (optional, defaults from config above)
@@ -700,19 +531,17 @@ if __name__ == "__main__":
 
     parser.add_argument("--cache_dir", type=str, default=config["cache_dir"])
     parser.add_argument("--log_dir", type=str, default=config["log_dir"])
+    parser.add_argument("--log_filename", type=str, default=config["log_filename"])
     parser.add_argument("--toggle_logging", action="store_true", default=config["toggle_logging"])
     parser.add_argument("--no_toggle_logging", action="store_false", dest="toggle_logging")
+    parser.add_argument("--summary_csv_path", type=str, default=config["summary_csv_path"])
     parser.add_argument("--toggle_summary_csv", action="store_true", default=config["toggle_summary_csv"])
     parser.add_argument("--no_toggle_summary_csv", action="store_false", dest="toggle_summary_csv")
-    parser.add_argument("--run_all_configs", action="store_true", default=config["run_all_configs"])
-    parser.add_argument("--no_run_all_configs", action="store_false", dest="run_all_configs")
 
     parser.add_argument("--process_bridge", action="store_true", default=config["process_bridge"])
     parser.add_argument("--bridge_strategy", type=str, default=config["bridge_strategy"])
     parser.add_argument("--process_hub", action="store_true", default=config["process_hub"])
     parser.add_argument("--hub_strategy", type=str, default=config["hub_strategy"])
-    parser.add_argument("--bridge_strategy_options", nargs="+", default=config["bridge_strategy_options"])
-    parser.add_argument("--hub_strategy_options", nargs="+", default=config["hub_strategy_options"])
     
     args = parser.parse_args()
     print(f"Using config: {args}")
@@ -723,79 +552,56 @@ if __name__ == "__main__":
     else:
         seeds = args.seeds if len(args.seeds) > 0 else [args.seed]
         print(f"Running seeds: {seeds}")
-        run_configs = build_strategy_run_configs(
-            run_all_configs=args.run_all_configs,
+
+        # Build data once before seed loop
+        print(f"\n=== Building training data ===")
+        task, data, col_stats_dict, entity_table = build_training_data(
+            dataset_name=args.dataset,
+            task_name=args.task,
+            cache_dir=args.cache_dir,
             process_bridge=args.process_bridge,
             bridge_strategy=args.bridge_strategy,
             process_hub=args.process_hub,
             hub_strategy=args.hub_strategy,
-            bridge_strategy_options=args.bridge_strategy_options,
-            hub_strategy_options=args.hub_strategy_options,
         )
-        print(f"Running {len(run_configs)} configuration(s)")
 
-        base_filename = f"{args.dataset}_{args.task}_{args.model}"
-        sweep_dir = os.path.join(args.log_dir, base_filename)
-        csv_path = os.path.join(args.log_dir, f"{base_filename}.csv")
 
-        for config_index, run_cfg in enumerate(run_configs, start=1):
-            process_bridge = cast(bool, run_cfg["process_bridge"])
-            bridge_strategy = cast(str, run_cfg["bridge_strategy"])
-            process_hub = cast(bool, run_cfg["process_hub"])
-            hub_strategy = cast(str, run_cfg["hub_strategy"])
-
-            print(
-                f"\n=== Configuration {config_index}/{len(run_configs)} | "
-                f"process_bridge={process_bridge} bridge_strategy={bridge_strategy} "
-                f"process_hub={process_hub} hub_strategy={hub_strategy} ==="
-            )
-
-            print("\n=== Building training data ===")
-            task, data, col_stats_dict, entity_table = build_training_data(
+        seed_results: list[Dict[str, float]] = []
+        for seed in seeds:
+            print(f"\n=== Running seed {seed} ===")
+            seed_log_filename = get_seed_log_filename(args.log_filename, seed)
+            result = run_training(
                 dataset_name=args.dataset,
                 task_name=args.task,
+                model_architecture=cast(Literal["sage", "dbformer", "sage_edge_attr"], args.model),
+                tabular_model=args.tabular_model,
+                task=task,
+                data=data,
+                col_stats_dict=col_stats_dict,
+                entity_table=entity_table,
+                seed=seed,
+                lr=args.lr,
+                min_epochs=args.min_epochs,
+                batch_size=args.batch_size,
+                channels=args.channels,
+                num_layers=args.num_layers,
+                num_neighbors=args.num_neighbors,
+                max_steps_per_epoch=args.max_steps_per_epoch,
+                min_total_steps=args.min_total_steps,
+                aggr=args.aggr,
+                mlp_norm=args.mlp_norm,
                 cache_dir=args.cache_dir,
-                process_bridge=process_bridge,
-                bridge_strategy=bridge_strategy,
-                process_hub=process_hub,
-                hub_strategy=hub_strategy,
+                log_dir=args.log_dir,
+                log_filename=seed_log_filename,
+                toggle_logging=args.toggle_logging,
+                process_bridge=args.process_bridge,
+                bridge_strategy=args.bridge_strategy,
+                process_hub=args.process_hub,
+                hub_strategy=args.hub_strategy,
             )
+            seed_results.append(result)
 
-            seed_results: list[Dict[str, Any]] = []
-            for seed in seeds:
-                print(f"\n=== Running seed {seed} ===")
-                result = run_training(
-                    dataset_name=args.dataset,
-                    task_name=args.task,
-                    model_architecture=cast(Literal["sage", "dbformer", "sage_edge_attr"], args.model),
-                    tabular_model=args.tabular_model,
-                    task=task,
-                    data=data,
-                    col_stats_dict=col_stats_dict,
-                    entity_table=entity_table,
-                    seed=seed,
-                    lr=args.lr,
-                    min_epochs=args.min_epochs,
-                    batch_size=args.batch_size,
-                    channels=args.channels,
-                    num_layers=args.num_layers,
-                    num_neighbors=args.num_neighbors,
-                    max_steps_per_epoch=args.max_steps_per_epoch,
-                    min_total_steps=args.min_total_steps,
-                    aggr=args.aggr,
-                    mlp_norm=args.mlp_norm,
-                    cache_dir=args.cache_dir,
-                    toggle_logging=args.toggle_logging,
-                    process_bridge=process_bridge,
-                    bridge_strategy=bridge_strategy,
-                    process_hub=process_hub,
-                    hub_strategy=hub_strategy,
-                )
-                seed_results.append(result)
-
-            if len(seed_results) == 0:
-                continue
-
+        if len(seed_results) > 0:
             print("\n=== Multi-seed summary ===")
             best_epochs = [int(r["best_epoch"]) for r in seed_results]
             train_times = np.array([r["training_time_s"] for r in seed_results], dtype=float)
@@ -828,45 +634,14 @@ if __name__ == "__main__":
                         print(f"  {key}: mean={np.mean(values):.3f}, var={np.var(values):.3f}")
 
             if args.toggle_summary_csv:
+                csv_filename = f"{args.dataset}_{args.task}_{args.model}.csv"
+                csv_path = os.path.join(args.log_dir, csv_filename)
                 save_aggregated_summary_csv(
                     csv_path=csv_path,
                     seeds=seeds,
-                    process_bridge=process_bridge,
-                    bridge_strategy=bridge_strategy,
-                    process_hub=process_hub,
-                    hub_strategy=hub_strategy,
-                    seed_results=seed_results,
-                )
-
-            if args.toggle_logging:
-                combined_run_params: Dict[str, object] = {
-                    "dataset": args.dataset,
-                    "task": args.task,
-                    "model_architecture": args.model,
-                    "tabular_model": args.tabular_model,
-                    "seeds": seeds,
-                    "lr": args.lr,
-                    "min_epochs": args.min_epochs,
-                    "batch_size": args.batch_size,
-                    "channels": args.channels,
-                    "num_layers": args.num_layers,
-                    "num_neighbors": args.num_neighbors,
-                    "max_steps_per_epoch": args.max_steps_per_epoch,
-                    "min_total_steps": args.min_total_steps,
-                    "aggr": args.aggr,
-                    "mlp_norm": args.mlp_norm,
-                    "process_bridge": process_bridge,
-                    "bridge_strategy": bridge_strategy,
-                    "process_hub": process_hub,
-                    "hub_strategy": hub_strategy,
-                }
-                config_id = save_sweep_manifest(
-                    sweep_dir=sweep_dir,
-                    run_params=combined_run_params,
-                )
-                json_path = os.path.join(sweep_dir, f"{config_id}.json")
-                save_multi_seed_log_json(
-                    json_path=json_path,
-                    run_params=combined_run_params,
+                    process_bridge=args.process_bridge,
+                    bridge_strategy=args.bridge_strategy,
+                    process_hub=args.process_hub,
+                    hub_strategy=args.hub_strategy,
                     seed_results=seed_results,
                 )

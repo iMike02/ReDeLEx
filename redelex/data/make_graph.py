@@ -191,7 +191,7 @@ class MakeGraph:
                 with_edge_attr, keep_table = False, False
         
         if self.cannot_delete[table_name]:
-            keep_table = True
+            keep_table, with_edge_attr = True, False
 
         table_pairs = list(itertools.combinations(list(table.fkey_col_to_pkey_table.items()), 2))
     
@@ -215,7 +215,7 @@ class MakeGraph:
                 with_edge_attr, keep_table = False, False
         
         if self.cannot_delete[table_name]:
-            keep_table = True
+            keep_table, with_edge_attr = True, False
 
         col_stats = dataset.col_stats
         self.col_stats_dict[table_name] = col_stats
