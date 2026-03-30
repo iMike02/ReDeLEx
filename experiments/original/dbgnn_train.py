@@ -1,6 +1,7 @@
 from typing import Any, Dict, Literal, Optional, Tuple, cast
 
 import csv
+import gc
 import json
 import math
 import os
@@ -54,6 +55,13 @@ def round_floats(value: object) -> object:
     if isinstance(value, list):
         return [round_floats(v) for v in value]
     return value
+
+
+def cleanup_runtime_memory() -> None:
+    """Free transient Python/Torch runtime memory without touching on-disk caches."""
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
 
 def init_training_log(log_path: str, run_params: Dict[str, object]) -> None:
@@ -209,8 +217,14 @@ def save_multi_seed_log_json(
     seed_results: list,
 ) -> None:
     os.makedirs(os.path.dirname(json_path), exist_ok=True)
+    run_combo_params = {
+        "process_bridge": run_params.get("process_bridge"),
+        "bridge_strategy": run_params.get("bridge_strategy"),
+        "process_hub": run_params.get("process_hub"),
+        "hub_strategy": run_params.get("hub_strategy"),
+    }
     payload: Dict[str, object] = {
-        "run_params": run_params,
+        "run_params": run_combo_params,
         "seed_runs": [
             {
                 "seed": int(r["seed"]),
@@ -228,90 +242,33 @@ def save_multi_seed_log_json(
 
 def save_sweep_manifest(
     sweep_dir: str,
-    run_params: Dict[str, object],
-) -> str:
+    shared_params: Dict[str, object],
+    run_configs: list[Dict[str, object]],
+) -> list[str]:
     os.makedirs(sweep_dir, exist_ok=True)
     manifest_path = os.path.join(sweep_dir, "configs.json")
-    manifest: Dict[str, object]
+    config_ids: list[str] = [f"cfg_{idx}" for idx in range(1, len(run_configs) + 1)]
 
-    if os.path.exists(manifest_path):
-        with open(manifest_path, "r", encoding="utf-8") as f:
-            manifest = cast(Dict[str, object], json.load(f))
-    else:
-        manifest = {"configs": {}}
-
-    # Normalize to cfg_N entries with only strategy-specific params.
-    raw_configs = cast(Dict[str, Any], manifest.get("configs", {}))
-    normalized_configs: Dict[str, Dict[str, object]] = {}
-    for idx, cfg in enumerate(raw_configs.values(), start=1):
-        cfg_id = f"cfg_{idx}"
-        cfg_dict = cast(Dict[str, Any], cfg) if isinstance(cfg, dict) else {}
-        normalized_configs[cfg_id] = {
+    manifest_configs: Dict[str, Dict[str, object]] = {}
+    for cfg_id, cfg in zip(config_ids, run_configs):
+        manifest_configs[cfg_id] = {
             "json_file": f"{cfg_id}.json",
-            "process_bridge": bool(cfg_dict.get("process_bridge", False)),
-            "bridge_strategy": str(cfg_dict.get("bridge_strategy", "default")),
-            "process_hub": bool(cfg_dict.get("process_hub", False)),
-            "hub_strategy": str(cfg_dict.get("hub_strategy", "default_combinations")),
+            "process_bridge": bool(cfg["process_bridge"]),
+            "bridge_strategy": str(cfg["bridge_strategy"]),
+            "process_hub": bool(cfg["process_hub"]),
+            "hub_strategy": str(cfg["hub_strategy"]),
         }
-    manifest["configs"] = normalized_configs
 
-    # Shared parameters for the whole sweep are stored once at the top-level.
-    shared_keys = [
-        "dataset",
-        "task",
-        "model_architecture",
-        "tabular_model",
-        "seeds",
-        "lr",
-        "min_epochs",
-        "batch_size",
-        "channels",
-        "num_layers",
-        "num_neighbors",
-        "max_steps_per_epoch",
-        "min_total_steps",
-        "aggr",
-        "mlp_norm",
-    ]
-    for key in shared_keys:
-        manifest[key] = run_params[key]
-
-    manifest_configs = cast(Dict[str, Dict[str, object]], manifest.setdefault("configs", {}))
-
-    # Reuse existing cfg_N if strategy combo already exists; otherwise create a new one.
-    config_id: Optional[str] = None
-    for existing_id, cfg in manifest_configs.items():
-        if (
-            cfg.get("process_bridge") == run_params["process_bridge"]
-            and cfg.get("bridge_strategy") == run_params["bridge_strategy"]
-            and cfg.get("process_hub") == run_params["process_hub"]
-            and cfg.get("hub_strategy") == run_params["hub_strategy"]
-        ):
-            config_id = existing_id
-            break
-
-    if config_id is None:
-        cfg_numbers = [
-            int(k.split("_")[1])
-            for k in manifest_configs.keys()
-            if isinstance(k, str) and k.startswith("cfg_") and k.split("_")[1].isdigit()
-        ]
-        next_idx = max(cfg_numbers) + 1 if len(cfg_numbers) > 0 else 1
-        config_id = f"cfg_{next_idx}"
-
-    manifest_configs[config_id] = {
-        "json_file": f"{config_id}.json",
-        "process_bridge": run_params["process_bridge"],
-        "bridge_strategy": run_params["bridge_strategy"],
-        "process_hub": run_params["process_hub"],
-        "hub_strategy": run_params["hub_strategy"],
+    manifest: Dict[str, object] = {
+        **shared_params,
+        "configs": manifest_configs,
     }
 
     with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(round_floats(manifest), f, indent=2)
 
-    print(f"Updated sweep manifest: {os.path.abspath(manifest_path)}")
-    return cast(str, config_id)
+    print(f"Saved sweep manifest: {os.path.abspath(manifest_path)}")
+    return config_ids
 
 
 def build_strategy_run_configs(
@@ -642,6 +599,12 @@ def run_training(
         **{f"best_val_{k}": v for k, v in best_val_metrics.items()},
         **{f"best_test_{k}": v for k, v in best_test_metrics.items()},
     }
+
+    del model
+    del optimizer
+    del loader_dict
+    cleanup_runtime_memory()
+
     return result
 
 
@@ -738,11 +701,52 @@ if __name__ == "__main__":
         sweep_dir = os.path.join(args.log_dir, base_filename)
         csv_path = os.path.join(args.log_dir, f"{base_filename}.csv")
 
+        shared_manifest_params: Dict[str, object] = {
+            "dataset": args.dataset,
+            "task": args.task,
+            "model_architecture": args.model,
+            "tabular_model": args.tabular_model,
+            "seeds": seeds,
+            "lr": args.lr,
+            "min_epochs": args.min_epochs,
+            "batch_size": args.batch_size,
+            "channels": args.channels,
+            "num_layers": args.num_layers,
+            "num_neighbors": args.num_neighbors,
+            "max_steps_per_epoch": args.max_steps_per_epoch,
+            "min_total_steps": args.min_total_steps,
+            "aggr": args.aggr,
+            "mlp_norm": args.mlp_norm,
+        }
+        config_ids: list[str] = []
+        if args.toggle_logging:
+            config_ids = save_sweep_manifest(
+                sweep_dir=sweep_dir,
+                shared_params=shared_manifest_params,
+                run_configs=run_configs,
+            )
+
         for config_index, run_cfg in enumerate(run_configs, start=1):
             process_bridge = cast(bool, run_cfg["process_bridge"])
             bridge_strategy = cast(str, run_cfg["bridge_strategy"])
             process_hub = cast(bool, run_cfg["process_hub"])
             hub_strategy = cast(str, run_cfg["hub_strategy"])
+
+            combined_run_params: Dict[str, object] = {
+                "process_bridge": process_bridge,
+                "bridge_strategy": bridge_strategy,
+                "process_hub": process_hub,
+                "hub_strategy": hub_strategy,
+            }
+            json_path: Optional[str] = None
+            if args.toggle_logging:
+                config_id = config_ids[config_index - 1]
+                json_path = os.path.join(sweep_dir, f"{config_id}.json")
+                save_multi_seed_log_json(
+                    json_path=json_path,
+                    run_params=combined_run_params,
+                    seed_results=[],
+                )
 
             print(
                 f"\n=== Configuration {config_index}/{len(run_configs)} | "
@@ -793,7 +797,21 @@ if __name__ == "__main__":
                 )
                 seed_results.append(result)
 
+                if args.toggle_logging and json_path is not None:
+                    save_multi_seed_log_json(
+                        json_path=json_path,
+                        run_params=combined_run_params,
+                        seed_results=seed_results,
+                    )
+
+                cleanup_runtime_memory()
+
             if len(seed_results) == 0:
+                del task
+                del data
+                del col_stats_dict
+                del entity_table
+                cleanup_runtime_memory()
                 continue
 
             print("\n=== Multi-seed summary ===")
@@ -838,35 +856,9 @@ if __name__ == "__main__":
                     seed_results=seed_results,
                 )
 
-            if args.toggle_logging:
-                combined_run_params: Dict[str, object] = {
-                    "dataset": args.dataset,
-                    "task": args.task,
-                    "model_architecture": args.model,
-                    "tabular_model": args.tabular_model,
-                    "seeds": seeds,
-                    "lr": args.lr,
-                    "min_epochs": args.min_epochs,
-                    "batch_size": args.batch_size,
-                    "channels": args.channels,
-                    "num_layers": args.num_layers,
-                    "num_neighbors": args.num_neighbors,
-                    "max_steps_per_epoch": args.max_steps_per_epoch,
-                    "min_total_steps": args.min_total_steps,
-                    "aggr": args.aggr,
-                    "mlp_norm": args.mlp_norm,
-                    "process_bridge": process_bridge,
-                    "bridge_strategy": bridge_strategy,
-                    "process_hub": process_hub,
-                    "hub_strategy": hub_strategy,
-                }
-                config_id = save_sweep_manifest(
-                    sweep_dir=sweep_dir,
-                    run_params=combined_run_params,
-                )
-                json_path = os.path.join(sweep_dir, f"{config_id}.json")
-                save_multi_seed_log_json(
-                    json_path=json_path,
-                    run_params=combined_run_params,
-                    seed_results=seed_results,
-                )
+            del seed_results
+            del task
+            del data
+            del col_stats_dict
+            del entity_table
+            cleanup_runtime_memory()
