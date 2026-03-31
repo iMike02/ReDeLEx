@@ -37,7 +37,9 @@ from experiments.utils import (
 )
 
 
-def get_model(architecture: Literal["sage", "dbformer", "sage_edge_attr"], entity_table: str, **kwargs):
+def get_model(
+    architecture: Literal["sage", "dbformer", "sage_edge_attr"], entity_table: str, **kwargs
+):
     if architecture == "sage":
         return SAGEModel(**kwargs)
     if architecture == "dbformer":
@@ -91,7 +93,9 @@ def append_epoch_log(
         "train_loss": float(train_loss),
         "training_time_s": float(training_time_s),
         "val_metrics": {k: float(v) for k, v in val_metrics.items()},
-        "test_metrics": {k: float(v) for k, v in test_metrics.items()} if test_metrics is not None else None,
+        "test_metrics": {k: float(v) for k, v in test_metrics.items()}
+        if test_metrics is not None
+        else None,
     }
     payload["epoch_history"].append(round_floats(entry))
 
@@ -111,14 +115,16 @@ def finalize_training_log(
     with open(log_path, "r", encoding="utf-8") as f:
         payload = json.load(f)
 
-    payload["summary"] = round_floats({
-        "best_epoch": int(best_epoch),
-        "best_val_metric_name": best_val_metric_name,
-        "best_val_metric_value": float(best_val_metric_value),
-        "best_val_metrics": {k: float(v) for k, v in best_val_metrics.items()},
-        "best_test_metrics": {k: float(v) for k, v in best_test_metrics.items()},
-        "total_training_time_s": float(total_training_time_s),
-    })
+    payload["summary"] = round_floats(
+        {
+            "best_epoch": int(best_epoch),
+            "best_val_metric_name": best_val_metric_name,
+            "best_val_metric_value": float(best_val_metric_value),
+            "best_val_metrics": {k: float(v) for k, v in best_val_metrics.items()},
+            "best_test_metrics": {k: float(v) for k, v in best_test_metrics.items()},
+            "total_training_time_s": float(total_training_time_s),
+        }
+    )
 
     with open(log_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2)
@@ -269,6 +275,32 @@ def save_sweep_manifest(
 
     print(f"Saved sweep manifest: {os.path.abspath(manifest_path)}")
     return config_ids
+
+
+def is_config_completed(json_path: str, expected_num_seeds: int) -> bool:
+    """Return True when a config log has all expected seed runs with non-empty summaries."""
+    if not os.path.exists(json_path):
+        return False
+
+    try:
+        with open(json_path, "r", encoding="utf-8") as f:
+            payload = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return False
+
+    seed_runs = payload.get("seed_runs", [])
+    if not isinstance(seed_runs, list) or len(seed_runs) < expected_num_seeds:
+        return False
+
+    completed = 0
+    for run in seed_runs:
+        if not isinstance(run, dict):
+            continue
+        summary = run.get("summary")
+        if isinstance(summary, dict) and len(summary) > 0:
+            completed += 1
+
+    return completed >= expected_num_seeds
 
 
 def build_strategy_run_configs(
@@ -450,7 +482,9 @@ def run_training(
         processed_steps = 0
         total_steps = max_steps_per_epoch
 
-        for step, batch in enumerate(tqdm(loader, total=total_steps, desc=f"train/{split}"), start=1):
+        for step, batch in enumerate(
+            tqdm(loader, total=total_steps, desc=f"train/{split}"), start=1
+        ):
             if step > max_steps_per_epoch:
                 break
 
@@ -611,43 +645,45 @@ def run_training(
 if __name__ == "__main__":
     # Configuration: Edit config dict or pass CLI args (CLI takes priority)
     config = {
-        "dataset": "rel-f1",
-        "task": "driver-position",
-        "model": "sage_edge_attr",          # "sage" | "dbformer" | "sage_edge_attr"
-        "tabular_model": "resnet",          # "resnet" | "linear"
+        "dataset": "rel-trial",
+        "task": "study-adverse",
+        "model": "sage_edge_attr",  # "sage" | "dbformer" | "sage_edge_attr"
+        "tabular_model": "resnet",  # "resnet" | "linear"
         "seed": 42,
         "seeds": [42, 43, 44, 45, 46],
-        "lr": 0.001,            #
-        "min_epochs": 2,       # 10
-        "batch_size": 16,      # 128
-        "channels": 32,         # 64
-        "num_layers": 2,        # 2
-        "num_neighbors": 16,            # 32
-        "max_steps_per_epoch": 5,    # 1000
-        "min_total_steps": 2,        # 1000
+        "lr": 0.001,  #
+        "min_epochs": 10,  # 10
+        "batch_size": 128,  # 128
+        "channels": 64,  # 64
+        "num_layers": 2,  # 2
+        "num_neighbors": 32,  # 32
+        "max_steps_per_epoch": 1000,  # 1000
+        "min_total_steps": 1000,  # 1000
         "aggr": "sum",
         "mlp_norm": "batch_norm",
-
         "cache_dir": ".cache",
         "log_dir": "logs/training_logs",
         "toggle_logging": True,
         "toggle_summary_csv": True,
         "run_all_configs": True,
-
         "process_bridge": False,
         "bridge_strategy": "default",  # "default" | "keep_attributes" | "keep_table"
         "process_hub": False,
-        "hub_strategy": "default_combinations",       # "default_combinations" | "keep_attributes" | "keep_table"
+        "hub_strategy": "default_combinations",  # "default_combinations" | "keep_attributes" | "keep_table"
         "bridge_strategy_options": ["default", "keep_attributes", "keep_table"],
-        "hub_strategy_options": ["default_combinations", "keep_attributes", "keep_table"],
+        "hub_strategy_options": [],  # "default_combinations", "keep_attributes", "keep_table"],
     }
-    
+
     # Parse CLI args (optional, defaults from config above)
     parser = ArgumentParser()
     parser.add_argument("--dataset", type=str, default=config["dataset"])
     parser.add_argument("--task", type=str, default=config["task"])
-    parser.add_argument("--model", choices=["sage", "dbformer", "sage_edge_attr"], default=config["model"])
-    parser.add_argument("--tabular_model", choices=["resnet", "linear"], default=config["tabular_model"])
+    parser.add_argument(
+        "--model", choices=["sage", "dbformer", "sage_edge_attr"], default=config["model"]
+    )
+    parser.add_argument(
+        "--tabular_model", choices=["resnet", "linear"], default=config["tabular_model"]
+    )
     parser.add_argument("--seed", type=int, default=config["seed"])
     parser.add_argument("--seeds", type=int, nargs="+", default=config["seeds"])
     parser.add_argument("--lr", type=float, default=config["lr"])
@@ -656,33 +692,62 @@ if __name__ == "__main__":
     parser.add_argument("--channels", type=int, default=config["channels"])
     parser.add_argument("--num_layers", type=int, default=config["num_layers"])
     parser.add_argument("--num_neighbors", type=int, default=config["num_neighbors"])
-    parser.add_argument("--max_steps_per_epoch", type=int, default=config["max_steps_per_epoch"])
+    parser.add_argument(
+        "--max_steps_per_epoch", type=int, default=config["max_steps_per_epoch"]
+    )
     parser.add_argument("--min_total_steps", type=int, default=config["min_total_steps"])
     parser.add_argument("--aggr", choices=["sum", "mean", "max"], default=config["aggr"])
-    parser.add_argument("--mlp_norm", choices=["batch_norm", "layer_norm"], default=config["mlp_norm"])
+    parser.add_argument(
+        "--mlp_norm", choices=["batch_norm", "layer_norm"], default=config["mlp_norm"]
+    )
 
     parser.add_argument("--cache_dir", type=str, default=config["cache_dir"])
     parser.add_argument("--log_dir", type=str, default=config["log_dir"])
-    parser.add_argument("--toggle_logging", action="store_true", default=config["toggle_logging"])
+    parser.add_argument(
+        "--toggle_logging", action="store_true", default=config["toggle_logging"]
+    )
     parser.add_argument("--no_toggle_logging", action="store_false", dest="toggle_logging")
-    parser.add_argument("--toggle_summary_csv", action="store_true", default=config["toggle_summary_csv"])
-    parser.add_argument("--no_toggle_summary_csv", action="store_false", dest="toggle_summary_csv")
-    parser.add_argument("--run_all_configs", action="store_true", default=config["run_all_configs"])
-    parser.add_argument("--no_run_all_configs", action="store_false", dest="run_all_configs")
+    parser.add_argument(
+        "--toggle_summary_csv", action="store_true", default=config["toggle_summary_csv"]
+    )
+    parser.add_argument(
+        "--no_toggle_summary_csv", action="store_false", dest="toggle_summary_csv"
+    )
+    parser.add_argument(
+        "--run_all_configs", action="store_true", default=config["run_all_configs"]
+    )
+    parser.add_argument(
+        "--no_run_all_configs", action="store_false", dest="run_all_configs"
+    )
 
-    parser.add_argument("--process_bridge", action="store_true", default=config["process_bridge"])
+    parser.add_argument("--start_config", type=int, default=1)
+    parser.add_argument("--end_config", type=int, default=None)
+    parser.add_argument("--skip_completed_configs", action="store_true", default=True)
+    parser.add_argument(
+        "--no_skip_completed_configs", action="store_false", dest="skip_completed_configs"
+    )
+
+    parser.add_argument(
+        "--process_bridge", action="store_true", default=config["process_bridge"]
+    )
     parser.add_argument("--bridge_strategy", type=str, default=config["bridge_strategy"])
     parser.add_argument("--process_hub", action="store_true", default=config["process_hub"])
     parser.add_argument("--hub_strategy", type=str, default=config["hub_strategy"])
-    parser.add_argument("--bridge_strategy_options", nargs="+", default=config["bridge_strategy_options"])
-    parser.add_argument("--hub_strategy_options", nargs="+", default=config["hub_strategy_options"])
-    
+    parser.add_argument(
+        "--bridge_strategy_options", nargs="+", default=config["bridge_strategy_options"]
+    )
+    parser.add_argument(
+        "--hub_strategy_options", nargs="+", default=config["hub_strategy_options"]
+    )
+
     args = parser.parse_args()
     print(f"Using config: {args}")
 
     task = get_task(args.dataset, args.task)
     if task.task_type in [TaskType.LINK_PREDICTION, TaskType.MULTILABEL_CLASSIFICATION]:
-        print(f"Skipping {args.dataset} - {args.task} (unsupported task type: {task.task_type})")
+        print(
+            f"Skipping {args.dataset} - {args.task} (unsupported task type: {task.task_type})"
+        )
     else:
         seeds = args.seeds if len(args.seeds) > 0 else [args.seed]
         print(f"Running seeds: {seeds}")
@@ -696,6 +761,11 @@ if __name__ == "__main__":
             hub_strategy_options=args.hub_strategy_options,
         )
         print(f"Running {len(run_configs)} configuration(s)")
+
+        if args.start_config < 1:
+            raise ValueError("--start_config must be >= 1")
+        if args.end_config is not None and args.end_config < args.start_config:
+            raise ValueError("--end_config must be >= --start_config")
 
         base_filename = f"{args.dataset}_{args.task}_{args.model}"
         sweep_dir = os.path.join(args.log_dir, base_filename)
@@ -727,6 +797,17 @@ if __name__ == "__main__":
             )
 
         for config_index, run_cfg in enumerate(run_configs, start=1):
+            if config_index < args.start_config:
+                print(
+                    f"Skipping cfg_{config_index}: below start_config={args.start_config}"
+                )
+                continue
+            if args.end_config is not None and config_index > args.end_config:
+                print(
+                    f"Stopping at cfg_{config_index - 1}: reached end_config={args.end_config}"
+                )
+                break
+
             process_bridge = cast(bool, run_cfg["process_bridge"])
             bridge_strategy = cast(str, run_cfg["bridge_strategy"])
             process_hub = cast(bool, run_cfg["process_hub"])
@@ -742,6 +823,15 @@ if __name__ == "__main__":
             if args.toggle_logging:
                 config_id = config_ids[config_index - 1]
                 json_path = os.path.join(sweep_dir, f"{config_id}.json")
+
+                if args.skip_completed_configs and is_config_completed(
+                    json_path, expected_num_seeds=len(seeds)
+                ):
+                    print(
+                        f"Skipping {config_id}: already completed for all {len(seeds)} seeds"
+                    )
+                    continue
+
                 save_multi_seed_log_json(
                     json_path=json_path,
                     run_params=combined_run_params,
@@ -771,7 +861,9 @@ if __name__ == "__main__":
                 result = run_training(
                     dataset_name=args.dataset,
                     task_name=args.task,
-                    model_architecture=cast(Literal["sage", "dbformer", "sage_edge_attr"], args.model),
+                    model_architecture=cast(
+                        Literal["sage", "dbformer", "sage_edge_attr"], args.model
+                    ),
                     tabular_model=args.tabular_model,
                     task=task,
                     data=data,
@@ -816,7 +908,9 @@ if __name__ == "__main__":
 
             print("\n=== Multi-seed summary ===")
             best_epochs = [int(r["best_epoch"]) for r in seed_results]
-            train_times = np.array([r["training_time_s"] for r in seed_results], dtype=float)
+            train_times = np.array(
+                [r["training_time_s"] for r in seed_results], dtype=float
+            )
 
             print(
                 " | ".join(
@@ -828,22 +922,34 @@ if __name__ == "__main__":
                 )
             )
 
-            val_metric_keys = sorted({k for r in seed_results for k in r.keys() if k.startswith("best_val_")})
-            test_metric_keys = sorted({k for r in seed_results for k in r.keys() if k.startswith("best_test_")})
+            val_metric_keys = sorted(
+                {k for r in seed_results for k in r.keys() if k.startswith("best_val_")}
+            )
+            test_metric_keys = sorted(
+                {k for r in seed_results for k in r.keys() if k.startswith("best_test_")}
+            )
 
             if len(val_metric_keys) > 0:
                 print("Validation metrics (mean/var):")
                 for key in val_metric_keys:
-                    values = np.array([r[key] for r in seed_results if key in r], dtype=float)
+                    values = np.array(
+                        [r[key] for r in seed_results if key in r], dtype=float
+                    )
                     if values.size > 0:
-                        print(f"  {key}: mean={np.mean(values):.3f}, var={np.var(values):.3f}")
+                        print(
+                            f"  {key}: mean={np.mean(values):.3f}, var={np.var(values):.3f}"
+                        )
 
             if len(test_metric_keys) > 0:
                 print("Test metrics (mean/var):")
                 for key in test_metric_keys:
-                    values = np.array([r[key] for r in seed_results if key in r], dtype=float)
+                    values = np.array(
+                        [r[key] for r in seed_results if key in r], dtype=float
+                    )
                     if values.size > 0:
-                        print(f"  {key}: mean={np.mean(values):.3f}, var={np.var(values):.3f}")
+                        print(
+                            f"  {key}: mean={np.mean(values):.3f}, var={np.var(values):.3f}"
+                        )
 
             if args.toggle_summary_csv:
                 save_aggregated_summary_csv(

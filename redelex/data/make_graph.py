@@ -19,13 +19,13 @@ from redelex.utils import to_unix_time
 import itertools
 
 
-
 class MakeGraph:
-    def __init__(self,
+    def __init__(
+        self,
         db: Database,
         col_to_stype_dict: Dict[str, Dict[str, stype]],
         text_embedder_cfg: Optional[TextEmbedderConfig] = None,
-        cache_dir: Optional[str] = None
+        cache_dir: Optional[str] = None,
     ):
         self.db = db
         self.col_to_stype_dict = col_to_stype_dict
@@ -37,13 +37,11 @@ class MakeGraph:
         self.__dataInit()
         assert self.data is not None and self.col_stats_dict is not None
 
-
     def __dataInit(self):
         self.data = HeteroData()
         self.col_stats_dict = dict()
         if self.cache_dir is not None:
             os.makedirs(self.cache_dir, exist_ok=True)
-
 
     def __remove_pkey_fkey(self, col_to_stype: Dict[str, Any], table: Table):
         r"""Remove pkey, fkey columns since they will not be used as input feature."""
@@ -54,7 +52,6 @@ class MakeGraph:
             if fkey in col_to_stype:
                 col_to_stype.pop(fkey)
 
-    
     def __make_dataset(self, table_name: str, table: Table) -> Dataset:
         # Materialize the tables into tensor frames:
         df = table.df
@@ -72,8 +69,12 @@ class MakeGraph:
             # We need to add edges later, so we need to also keep the fkeys
             fkey_dict = {key: df[key] for key in table.fkey_col_to_pkey_table}
             df = pd.DataFrame({"__const__": np.ones(len(table.df)), **fkey_dict})
-        
-        path = None if self.cache_dir is None else os.path.join(self.cache_dir, f"{table_name}.pt")
+
+        path = (
+            None
+            if self.cache_dir is None
+            else os.path.join(self.cache_dir, f"{table_name}.pt")
+        )
 
         dataset = Dataset(
             df=df,
@@ -108,11 +109,16 @@ class MakeGraph:
         if len(tensor_list) == 0:
             return None
 
+        # Ensure all tensors are on the same device before concatenation
+        device = tensor_list[0].device
+        tensor_list = [t.to(device) for t in tensor_list]
         edge_attr = torch.cat(tensor_list, dim=-1)
         edge_attr = torch.nan_to_num(edge_attr, nan=0.0, posinf=0.0, neginf=0.0)
         return edge_attr
-    
-    def __create_edge(self, table_1, table_2, df, table_name: str, dataset: Dataset, with_edge_attr: bool):
+
+    def __create_edge(
+        self, table_1, table_2, df, table_name: str, dataset: Dataset, with_edge_attr: bool
+    ):
         fkey_name, pkey_table_name = table_1
         fkey_name_2, pkey_table_name_2 = table_2
 
@@ -122,7 +128,6 @@ class MakeGraph:
         mask = (~pkey_index.isna()) & (~pkey_index_2.isna())
         pkey_index = torch.from_numpy(pkey_index[mask].astype(int).values)
         pkey_index_2 = torch.from_numpy(pkey_index_2[mask].astype(int).values)
-
 
         # Include the link table name in relation labels so edges from
         # different link tables never collide in HeteroData.
@@ -148,17 +153,28 @@ class MakeGraph:
                 self.data[edge_type_1].edge_attr = edge_attr
                 self.data[edge_type_2].edge_attr = edge_attr
 
-    def pkey_fkey_structure_to_graph(self, df, table_name: str, table: Table, dataset: Dataset):     # Default method to create graph with pkey-fkey edges
+    def pkey_fkey_structure_to_graph(
+        self, df, table_name: str, table: Table, dataset: Dataset
+    ):  # Default method to create graph with pkey-fkey edges
         # Add table node features:
         self.data[table_name].tf = dataset.tensor_frame
         self.col_stats_dict[table_name] = dataset.col_stats
 
         # Add time attribute:
         if table.time_col is not None:
-            self.data[table_name].time = torch.from_numpy(to_unix_time(table.df[table.time_col]))
+            self.data[table_name].time = torch.from_numpy(
+                to_unix_time(table.df[table.time_col])
+            )
 
         # Add edges:
         for fkey_name, pkey_table_name in table.fkey_col_to_pkey_table.items():
+            if pkey_table_name not in self.db.table_dict:
+                print(
+                    f"[WARN] Skipping edge {table_name}.{fkey_name} -> {pkey_table_name}: "
+                    "target table not found in db.table_dict"
+                )
+                continue
+
             pkey_index = df[fkey_name]
             # Filter out dangling foreign keys
             mask = ~pkey_index.isna()
@@ -172,16 +188,22 @@ class MakeGraph:
             # fkey -> pkey edges
             edge_index = torch.stack([fkey_index, pkey_index], dim=0)
             edge_type = (table_name, f"f2p_{fkey_name}", pkey_table_name)
-            self.data[edge_type].edge_index = sort_edge_index(edge_index) # type: ignore
+            self.data[edge_type].edge_index = sort_edge_index(edge_index)  # type: ignore
 
             # pkey -> fkey edges.
             # "rev_" is added so that PyG loader recognizes the reverse edges
             edge_index = torch.stack([pkey_index, fkey_index], dim=0)
             edge_type = (pkey_table_name, f"rev_f2p_{fkey_name}", table_name)
             self.data[edge_type].edge_index = sort_edge_index(edge_index)
-    
 
-    def hub_structure_to_graph(self, df, table_name: str, table: Table, dataset: Dataset, hubStrategy: str = "default"):
+    def hub_structure_to_graph(
+        self,
+        df,
+        table_name: str,
+        table: Table,
+        dataset: Dataset,
+        hubStrategy: str = "default",
+    ):
         match hubStrategy:
             case "keep_attributes":
                 with_edge_attr, keep_table = True, False
@@ -189,23 +211,31 @@ class MakeGraph:
                 with_edge_attr, keep_table = False, True
             case _:
                 with_edge_attr, keep_table = False, False
-        
+
         if self.cannot_delete[table_name]:
             keep_table, with_edge_attr = True, False
 
-        table_pairs = list(itertools.combinations(list(table.fkey_col_to_pkey_table.items()), 2))
-    
+        table_pairs = list(
+            itertools.combinations(list(table.fkey_col_to_pkey_table.items()), 2)
+        )
+
         col_stats = dataset.col_stats
         self.col_stats_dict[table_name] = col_stats
 
         for table_1, table_2 in table_pairs:
             self.__create_edge(table_1, table_2, df, table_name, dataset, with_edge_attr)
-        
+
         if keep_table:
             self.pkey_fkey_structure_to_graph(df, table_name, table, dataset)
 
-
-    def bridge_structure_to_graph(self, df, table_name: str, table: Table, dataset: Dataset, bridgeStrategy: str = "default"):
+    def bridge_structure_to_graph(
+        self,
+        df,
+        table_name: str,
+        table: Table,
+        dataset: Dataset,
+        bridgeStrategy: str = "default",
+    ):
         match bridgeStrategy:
             case "keep_attributes":
                 with_edge_attr, keep_table = True, False
@@ -213,26 +243,25 @@ class MakeGraph:
                 with_edge_attr, keep_table = False, True
             case _:
                 with_edge_attr, keep_table = False, False
-        
+
         if self.cannot_delete[table_name]:
             keep_table, with_edge_attr = True, False
 
         col_stats = dataset.col_stats
         self.col_stats_dict[table_name] = col_stats
 
-
         table_1, table_2 = table.fkey_col_to_pkey_table.items()
         self.__create_edge(table_1, table_2, df, table_name, dataset, with_edge_attr)
-    
+
         if keep_table:
             self.pkey_fkey_structure_to_graph(df, table_name, table, dataset)
 
-
-    def main(self,
-             process_bridge: bool = False,
-             bridgeStrategy: str = "default",
-             process_hub: bool = False,
-             hubStrategy: str = "default_combinations"
+    def main(
+        self,
+        process_bridge: bool = False,
+        bridgeStrategy: str = "default",
+        process_hub: bool = False,
+        hubStrategy: str = "default_combinations",
     ) -> Tuple[HeteroData, Dict[str, Dict[str, Dict[StatType, Any]]]]:
         r"""Given a :class:`Database` object, construct a heterogeneous graph with primary-
         foreign key relationships, together with the column stats of each table.
@@ -254,7 +283,7 @@ class MakeGraph:
         self.cannot_delete = dict()
         for table_name in self.db.table_dict.keys():
             self.cannot_delete[table_name] = False
-        
+
         for table_name, table in self.db.table_dict.items():
             for t in table.fkey_col_to_pkey_table.values():
                 self.cannot_delete[t] = True
@@ -267,11 +296,12 @@ class MakeGraph:
                 self.hub_structure_to_graph(df, table_name, table, dataset, hubStrategy)
 
             elif process_bridge and len(table.fkey_col_to_pkey_table.items()) == 2:
-                self.bridge_structure_to_graph(df, table_name, table, dataset, bridgeStrategy)
+                self.bridge_structure_to_graph(
+                    df, table_name, table, dataset, bridgeStrategy
+                )
 
             else:
                 self.pkey_fkey_structure_to_graph(df, table_name, table, dataset)
-            
 
         self.data.validate()
 
@@ -286,7 +316,7 @@ def make_pkey_fkey_graph_custom(
     process_bridge: bool = False,
     bridgeStrategy: str = "default",
     process_hub: bool = False,
-    hubStrategy: str = "default_combinations"
+    hubStrategy: str = "default_combinations",
 ) -> Tuple[HeteroData, Dict[str, Dict[str, Dict[StatType, Any]]]]:
     r"""Given a :class:`Database` object, construct a heterogeneous graph with primary-
     foreign key relationships, together with the column stats of each table.
@@ -309,12 +339,12 @@ def make_pkey_fkey_graph_custom(
         db=db,
         col_to_stype_dict=col_to_stype_dict,
         text_embedder_cfg=text_embedder_cfg,
-        cache_dir=cache_dir
+        cache_dir=cache_dir,
     )
-    
+
     return graph_maker.main(
         process_bridge=process_bridge,
         bridgeStrategy=bridgeStrategy,
         process_hub=process_hub,
-        hubStrategy=hubStrategy
+        hubStrategy=hubStrategy,
     )

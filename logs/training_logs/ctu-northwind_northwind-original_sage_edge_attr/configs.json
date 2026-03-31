@@ -1,0 +1,81 @@
+{
+  "dataset": "ctu-northwind",
+  "task": "northwind-original",
+  "model_architecture": "sage_edge_attr",
+  "tabular_model": "resnet",
+  "seeds": [
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "lr": 0.001,
+  "min_epochs": 10,
+  "batch_size": 128,
+  "channels": 64,
+  "num_layers": 2,
+  "num_neighbors": 32,
+  "max_steps_per_epoch": 1000,
+  "min_total_steps": 1000,
+  "aggr": "sum",
+  "mlp_norm": "batch_norm",
+  "configs": {
+    "cfg_1": {
+      "json_file": "cfg_1.json",
+      "process_bridge": false,
+      "bridge_strategy": "default",
+      "process_hub": false,
+      "hub_strategy": "default_combinations"
+    },
+    "cfg_2": {
+      "json_file": "cfg_2.json",
+      "process_bridge": false,
+      "bridge_strategy": "default",
+      "process_hub": true,
+      "hub_strategy": "keep_table"
+    },
+    "cfg_3": {
+      "json_file": "cfg_3.json",
+      "process_bridge": true,
+      "bridge_strategy": "default",
+      "process_hub": false,
+      "hub_strategy": "default_combinations"
+    },
+    "cfg_4": {
+      "json_file": "cfg_4.json",
+      "process_bridge": true,
+      "bridge_strategy": "keep_attributes",
+      "process_hub": false,
+      "hub_strategy": "default_combinations"
+    },
+    "cfg_5": {
+      "json_file": "cfg_5.json",
+      "process_bridge": true,
+      "bridge_strategy": "keep_table",
+      "process_hub": false,
+      "hub_strategy": "default_combinations"
+    },
+    "cfg_6": {
+      "json_file": "cfg_6.json",
+      "process_bridge": true,
+      "bridge_strategy": "default",
+      "process_hub": true,
+      "hub_strategy": "keep_table"
+    },
+    "cfg_7": {
+      "json_file": "cfg_7.json",
+      "process_bridge": true,
+      "bridge_strategy": "keep_attributes",
+      "process_hub": true,
+      "hub_strategy": "keep_table"
+    },
+    "cfg_8": {
+      "json_file": "cfg_8.json",
+      "process_bridge": true,
+      "bridge_strategy": "keep_table",
+      "process_hub": true,
+      "hub_strategy": "keep_table"
+    }
+  }
+}
