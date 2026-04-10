@@ -424,6 +424,8 @@ def run_training(
     bridge_strategy: str = "default",
     process_hub: bool = False,
     hub_strategy: str = "default_combinations",
+    lr_decay_start_step: int = 0,
+    lr_decay_steps: int = 0,
 ) -> Dict[str, Any]:
     random.seed(seed)
     np.random.seed(seed)
@@ -473,6 +475,31 @@ def run_training(
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
+    if lr_decay_start_step < 0:
+        raise ValueError("lr_decay_start_step must be >= 0")
+    if lr_decay_steps < 0:
+        raise ValueError("lr_decay_steps must be >= 0")
+
+    scheduler: Optional[torch.optim.lr_scheduler.LRScheduler] = None
+    if lr_decay_steps > 0:
+        if lr_decay_start_step > 0:
+            scheduler = torch.optim.lr_scheduler.SequentialLR(
+                optimizer,
+                schedulers=[
+                    torch.optim.lr_scheduler.ConstantLR(
+                        optimizer, factor=1.0, total_iters=lr_decay_start_step
+                    ),
+                    torch.optim.lr_scheduler.LinearLR(
+                        optimizer, start_factor=1.0, end_factor=0.0, total_iters=lr_decay_steps
+                    ),
+                ],
+                milestones=[lr_decay_start_step],
+            )
+        else:
+            scheduler = torch.optim.lr_scheduler.LinearLR(
+                optimizer, start_factor=1.0, end_factor=0.0, total_iters=lr_decay_steps
+            )
+
     def train(split: str = "train") -> float:
         model.train()
         loader = loader_dict[split]
@@ -505,6 +532,8 @@ def run_training(
             loss = loss_fn(pred.float(), target)
             loss.backward()
             optimizer.step()
+            if scheduler is not None:
+                scheduler.step()
 
             loss_accum += loss.detach().item() * pred.size(0)
             count_accum += pred.size(0)
@@ -547,6 +576,11 @@ def run_training(
         f"Start training | dataset={dataset_name} task={task_name} model={model_architecture} "
         f"epochs={n_epochs} batch={batch_size} neighbors={num_neighbors}"
     )
+    if lr_decay_steps > 0:
+        print(
+            f"LR scheduler: linear decay starts at step {lr_decay_start_step} "
+            f"over {lr_decay_steps} steps"
+        )
 
     epoch_history: list[Dict[str, object]] = []
 
@@ -636,6 +670,8 @@ def run_training(
 
     del model
     del optimizer
+    if scheduler is not None:
+        del scheduler
     del loader_dict
     cleanup_runtime_memory()
 
@@ -661,6 +697,8 @@ if __name__ == "__main__":
         "min_total_steps": 1000,  # 1000
         "aggr": "sum",
         "mlp_norm": "batch_norm",
+        "lr_decay_start_step": 0,
+        "lr_decay_steps": 0,
         "cache_dir": ".cache",
         "log_dir": "logs/training_logs",
         "toggle_logging": True,
@@ -700,6 +738,10 @@ if __name__ == "__main__":
     parser.add_argument(
         "--mlp_norm", choices=["batch_norm", "layer_norm"], default=config["mlp_norm"]
     )
+    parser.add_argument(
+        "--lr_decay_start_step", type=int, default=config["lr_decay_start_step"]
+    )
+    parser.add_argument("--lr_decay_steps", type=int, default=config["lr_decay_steps"])
 
     parser.add_argument("--cache_dir", type=str, default=config["cache_dir"])
     parser.add_argument("--log_dir", type=str, default=config["log_dir"])
@@ -787,6 +829,8 @@ if __name__ == "__main__":
             "min_total_steps": args.min_total_steps,
             "aggr": args.aggr,
             "mlp_norm": args.mlp_norm,
+            "lr_decay_start_step": args.lr_decay_start_step,
+            "lr_decay_steps": args.lr_decay_steps,
         }
         config_ids: list[str] = []
         if args.toggle_logging:
@@ -886,6 +930,8 @@ if __name__ == "__main__":
                     bridge_strategy=bridge_strategy,
                     process_hub=process_hub,
                     hub_strategy=hub_strategy,
+                    lr_decay_start_step=args.lr_decay_start_step,
+                    lr_decay_steps=args.lr_decay_steps,
                 )
                 seed_results.append(result)
 
