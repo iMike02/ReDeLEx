@@ -1,0 +1,95 @@
+{
+  "run_params": {
+    "process_bridge": true,
+    "bridge_strategy": "keep_table",
+    "process_hub": true,
+    "hub_strategy": "keep_table"
+  },
+  "seed_runs": [
+    {
+      "seed": 42,
+      "epoch_history": [
+        {
+          "epoch": 1,
+          "lr": 0.001,
+          "train_loss": 37.984,
+          "training_time_s": 48.817,
+          "val_metrics": {
+            "mae": 53.847,
+            "mse": 154935.658,
+            "r2": -0.013
+          },
+          "test_metrics": {
+            "mae": 54.21,
+            "mse": 64213.558,
+            "r2": -0.03
+          }
+        },
+        {
+          "epoch": 2,
+          "lr": 0.001,
+          "train_loss": 36.427,
+          "training_time_s": 99.211,
+          "val_metrics": {
+            "mae": 52.37,
+            "mse": 153831.801,
+            "r2": -0.006
+          },
+          "test_metrics": {
+            "mae": 52.408,
+            "mse": 62939.414,
+            "r2": -0.01
+          }
+        },
+        {
+          "epoch": 3,
+          "lr": 0.001,
+          "train_loss": 35.501,
+          "training_time_s": 149.638,
+          "val_metrics": {
+            "mae": 51.506,
+            "mse": 152874.336,
+            "r2": 0.001
+          },
+          "test_metrics": {
+            "mae": 51.377,
+            "mse": 61835.545,
+            "r2": 0.008
+          }
+        }
+      ],
+      "summary": {
+        "best_epoch": 3,
+        "best_val_metric_name": "mae",
+        "best_val_metric_value": 51.506,
+        "best_val_metrics": {
+          "mae": 51.506,
+          "mse": 152874.336,
+          "r2": 0.001
+        },
+        "best_test_metrics": {
+          "mae": 51.377,
+          "mse": 61835.545,
+          "r2": 0.008
+        },
+        "total_training_time_s": 149.638
+      }
+    }
+  ],
+  "aggregate": {
+    "best_epochs": "[3]",
+    "avg_training_time_s": 149.638,
+    "best_test_mae_mean": 51.377,
+    "best_test_mae_var": 0.0,
+    "best_test_mse_mean": 61835.545,
+    "best_test_mse_var": 0.0,
+    "best_test_r2_mean": 0.008,
+    "best_test_r2_var": 0.0,
+    "best_val_mae_mean": 51.506,
+    "best_val_mae_var": 0.0,
+    "best_val_mse_mean": 152874.337,
+    "best_val_mse_var": 0.0,
+    "best_val_r2_mean": 0.001,
+    "best_val_r2_var": 0.0
+  }
+}

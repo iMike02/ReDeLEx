@@ -1,0 +1,865 @@
+{
+  "run_params": {
+    "process_bridge": true,
+    "bridge_strategy": "keep_attributes",
+    "process_hub": false,
+    "hub_strategy": "default_combinations"
+  },
+  "seed_runs": [
+    {
+      "seed": 42,
+      "epoch_history": [
+        {
+          "epoch": 1,
+          "lr": 0.001,
+          "train_loss": 0.307,
+          "training_time_s": 36.518,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.939,
+            "f1": 0.949,
+            "roc_auc": 0.639
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.902,
+            "f1": 0.919,
+            "roc_auc": 0.658
+          }
+        },
+        {
+          "epoch": 2,
+          "lr": 0.001,
+          "train_loss": 0.301,
+          "training_time_s": 73.853,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.939,
+            "f1": 0.949,
+            "roc_auc": 0.648
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.905,
+            "f1": 0.919,
+            "roc_auc": 0.692
+          }
+        },
+        {
+          "epoch": 3,
+          "lr": 0.001,
+          "train_loss": 0.3,
+          "training_time_s": 110.988,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.94,
+            "f1": 0.949,
+            "roc_auc": 0.652
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.906,
+            "f1": 0.919,
+            "roc_auc": 0.696
+          }
+        },
+        {
+          "epoch": 4,
+          "lr": 0.001,
+          "train_loss": 0.3,
+          "training_time_s": 148.277,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.941,
+            "f1": 0.949,
+            "roc_auc": 0.657
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.907,
+            "f1": 0.919,
+            "roc_auc": 0.707
+          }
+        },
+        {
+          "epoch": 5,
+          "lr": 0.001,
+          "train_loss": 0.3,
+          "training_time_s": 185.596,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.941,
+            "f1": 0.949,
+            "roc_auc": 0.658
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.908,
+            "f1": 0.919,
+            "roc_auc": 0.708
+          }
+        },
+        {
+          "epoch": 6,
+          "lr": 0.001,
+          "train_loss": 0.299,
+          "training_time_s": 222.832,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.941,
+            "f1": 0.949,
+            "roc_auc": 0.659
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.908,
+            "f1": 0.919,
+            "roc_auc": 0.708
+          }
+        },
+        {
+          "epoch": 7,
+          "lr": 0.0,
+          "train_loss": 0.299,
+          "training_time_s": 260.115,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.941,
+            "f1": 0.949,
+            "roc_auc": 0.659
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.908,
+            "f1": 0.919,
+            "roc_auc": 0.708
+          }
+        },
+        {
+          "epoch": 8,
+          "lr": 0.0,
+          "train_loss": 0.299,
+          "training_time_s": 298.386,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.941,
+            "f1": 0.949,
+            "roc_auc": 0.66
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.908,
+            "f1": 0.919,
+            "roc_auc": 0.708
+          }
+        }
+      ],
+      "summary": {
+        "best_epoch": 8,
+        "best_val_metric_name": "roc_auc",
+        "best_val_metric_value": 0.66,
+        "best_val_metrics": {
+          "accuracy": 0.903,
+          "average_precision": 0.941,
+          "f1": 0.949,
+          "roc_auc": 0.66
+        },
+        "best_test_metrics": {
+          "accuracy": 0.851,
+          "average_precision": 0.908,
+          "f1": 0.919,
+          "roc_auc": 0.708
+        },
+        "total_training_time_s": 298.386
+      }
+    },
+    {
+      "seed": 43,
+      "epoch_history": [
+        {
+          "epoch": 1,
+          "lr": 0.001,
+          "train_loss": 0.303,
+          "training_time_s": 37.152,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.938,
+            "f1": 0.949,
+            "roc_auc": 0.637
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.898,
+            "f1": 0.919,
+            "roc_auc": 0.651
+          }
+        },
+        {
+          "epoch": 2,
+          "lr": 0.001,
+          "train_loss": 0.3,
+          "training_time_s": 74.647,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.94,
+            "f1": 0.949,
+            "roc_auc": 0.653
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.907,
+            "f1": 0.919,
+            "roc_auc": 0.705
+          }
+        },
+        {
+          "epoch": 3,
+          "lr": 0.001,
+          "train_loss": 0.3,
+          "training_time_s": 112.125,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.94,
+            "f1": 0.949,
+            "roc_auc": 0.654
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.907,
+            "f1": 0.919,
+            "roc_auc": 0.706
+          }
+        },
+        {
+          "epoch": 4,
+          "lr": 0.001,
+          "train_loss": 0.3,
+          "training_time_s": 149.891,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.941,
+            "f1": 0.949,
+            "roc_auc": 0.658
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.908,
+            "f1": 0.919,
+            "roc_auc": 0.709
+          }
+        },
+        {
+          "epoch": 5,
+          "lr": 0.001,
+          "train_loss": 0.3,
+          "training_time_s": 187.274,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.941,
+            "f1": 0.949,
+            "roc_auc": 0.663
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.908,
+            "f1": 0.919,
+            "roc_auc": 0.709
+          }
+        },
+        {
+          "epoch": 6,
+          "lr": 0.001,
+          "train_loss": 0.299,
+          "training_time_s": 224.591,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.941,
+            "f1": 0.949,
+            "roc_auc": 0.66
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.908,
+            "f1": 0.919,
+            "roc_auc": 0.709
+          }
+        },
+        {
+          "epoch": 7,
+          "lr": 0.0,
+          "train_loss": 0.299,
+          "training_time_s": 262.026,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.941,
+            "f1": 0.949,
+            "roc_auc": 0.661
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.908,
+            "f1": 0.919,
+            "roc_auc": 0.71
+          }
+        },
+        {
+          "epoch": 8,
+          "lr": 0.0,
+          "train_loss": 0.299,
+          "training_time_s": 299.398,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.941,
+            "f1": 0.949,
+            "roc_auc": 0.661
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.908,
+            "f1": 0.919,
+            "roc_auc": 0.709
+          }
+        }
+      ],
+      "summary": {
+        "best_epoch": 5,
+        "best_val_metric_name": "roc_auc",
+        "best_val_metric_value": 0.663,
+        "best_val_metrics": {
+          "accuracy": 0.903,
+          "average_precision": 0.941,
+          "f1": 0.949,
+          "roc_auc": 0.663
+        },
+        "best_test_metrics": {
+          "accuracy": 0.851,
+          "average_precision": 0.908,
+          "f1": 0.919,
+          "roc_auc": 0.709
+        },
+        "total_training_time_s": 299.398
+      }
+    },
+    {
+      "seed": 44,
+      "epoch_history": [
+        {
+          "epoch": 1,
+          "lr": 0.001,
+          "train_loss": 0.305,
+          "training_time_s": 37.542,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.94,
+            "f1": 0.949,
+            "roc_auc": 0.655
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.907,
+            "f1": 0.919,
+            "roc_auc": 0.705
+          }
+        },
+        {
+          "epoch": 2,
+          "lr": 0.001,
+          "train_loss": 0.301,
+          "training_time_s": 74.858,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.94,
+            "f1": 0.949,
+            "roc_auc": 0.651
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.907,
+            "f1": 0.919,
+            "roc_auc": 0.704
+          }
+        },
+        {
+          "epoch": 3,
+          "lr": 0.001,
+          "train_loss": 0.3,
+          "training_time_s": 112.179,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.94,
+            "f1": 0.949,
+            "roc_auc": 0.658
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.907,
+            "f1": 0.919,
+            "roc_auc": 0.708
+          }
+        },
+        {
+          "epoch": 4,
+          "lr": 0.001,
+          "train_loss": 0.3,
+          "training_time_s": 149.766,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.941,
+            "f1": 0.949,
+            "roc_auc": 0.66
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.908,
+            "f1": 0.919,
+            "roc_auc": 0.709
+          }
+        },
+        {
+          "epoch": 5,
+          "lr": 0.001,
+          "train_loss": 0.3,
+          "training_time_s": 187.614,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.942,
+            "f1": 0.949,
+            "roc_auc": 0.665
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.909,
+            "f1": 0.919,
+            "roc_auc": 0.71
+          }
+        },
+        {
+          "epoch": 6,
+          "lr": 0.001,
+          "train_loss": 0.299,
+          "training_time_s": 225.148,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.942,
+            "f1": 0.949,
+            "roc_auc": 0.665
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.909,
+            "f1": 0.919,
+            "roc_auc": 0.709
+          }
+        },
+        {
+          "epoch": 7,
+          "lr": 0.0,
+          "train_loss": 0.299,
+          "training_time_s": 262.49,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.942,
+            "f1": 0.949,
+            "roc_auc": 0.666
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.909,
+            "f1": 0.919,
+            "roc_auc": 0.709
+          }
+        },
+        {
+          "epoch": 8,
+          "lr": 0.0,
+          "train_loss": 0.299,
+          "training_time_s": 300.115,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.942,
+            "f1": 0.949,
+            "roc_auc": 0.666
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.909,
+            "f1": 0.919,
+            "roc_auc": 0.709
+          }
+        }
+      ],
+      "summary": {
+        "best_epoch": 8,
+        "best_val_metric_name": "roc_auc",
+        "best_val_metric_value": 0.666,
+        "best_val_metrics": {
+          "accuracy": 0.903,
+          "average_precision": 0.942,
+          "f1": 0.949,
+          "roc_auc": 0.666
+        },
+        "best_test_metrics": {
+          "accuracy": 0.851,
+          "average_precision": 0.909,
+          "f1": 0.919,
+          "roc_auc": 0.709
+        },
+        "total_training_time_s": 300.115
+      }
+    },
+    {
+      "seed": 45,
+      "epoch_history": [
+        {
+          "epoch": 1,
+          "lr": 0.001,
+          "train_loss": 0.303,
+          "training_time_s": 37.517,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.939,
+            "f1": 0.949,
+            "roc_auc": 0.648
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.905,
+            "f1": 0.919,
+            "roc_auc": 0.695
+          }
+        },
+        {
+          "epoch": 2,
+          "lr": 0.001,
+          "train_loss": 0.301,
+          "training_time_s": 75.181,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.94,
+            "f1": 0.949,
+            "roc_auc": 0.652
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.906,
+            "f1": 0.919,
+            "roc_auc": 0.703
+          }
+        },
+        {
+          "epoch": 3,
+          "lr": 0.001,
+          "train_loss": 0.3,
+          "training_time_s": 113.861,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.941,
+            "f1": 0.949,
+            "roc_auc": 0.658
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.906,
+            "f1": 0.919,
+            "roc_auc": 0.693
+          }
+        },
+        {
+          "epoch": 4,
+          "lr": 0.001,
+          "train_loss": 0.3,
+          "training_time_s": 151.888,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.942,
+            "f1": 0.949,
+            "roc_auc": 0.664
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.908,
+            "f1": 0.919,
+            "roc_auc": 0.709
+          }
+        },
+        {
+          "epoch": 5,
+          "lr": 0.001,
+          "train_loss": 0.299,
+          "training_time_s": 189.854,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.942,
+            "f1": 0.949,
+            "roc_auc": 0.67
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.908,
+            "f1": 0.919,
+            "roc_auc": 0.706
+          }
+        },
+        {
+          "epoch": 6,
+          "lr": 0.001,
+          "train_loss": 0.299,
+          "training_time_s": 227.26,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.942,
+            "f1": 0.949,
+            "roc_auc": 0.67
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.907,
+            "f1": 0.919,
+            "roc_auc": 0.703
+          }
+        },
+        {
+          "epoch": 7,
+          "lr": 0.0,
+          "train_loss": 0.299,
+          "training_time_s": 265.074,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.942,
+            "f1": 0.949,
+            "roc_auc": 0.67
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.907,
+            "f1": 0.919,
+            "roc_auc": 0.705
+          }
+        },
+        {
+          "epoch": 8,
+          "lr": 0.0,
+          "train_loss": 0.299,
+          "training_time_s": 302.721,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.942,
+            "f1": 0.949,
+            "roc_auc": 0.67
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.908,
+            "f1": 0.919,
+            "roc_auc": 0.705
+          }
+        }
+      ],
+      "summary": {
+        "best_epoch": 5,
+        "best_val_metric_name": "roc_auc",
+        "best_val_metric_value": 0.67,
+        "best_val_metrics": {
+          "accuracy": 0.903,
+          "average_precision": 0.942,
+          "f1": 0.949,
+          "roc_auc": 0.67
+        },
+        "best_test_metrics": {
+          "accuracy": 0.851,
+          "average_precision": 0.908,
+          "f1": 0.919,
+          "roc_auc": 0.706
+        },
+        "total_training_time_s": 302.721
+      }
+    },
+    {
+      "seed": 46,
+      "epoch_history": [
+        {
+          "epoch": 1,
+          "lr": 0.001,
+          "train_loss": 0.305,
+          "training_time_s": 37.498,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.938,
+            "f1": 0.949,
+            "roc_auc": 0.636
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.897,
+            "f1": 0.919,
+            "roc_auc": 0.643
+          }
+        },
+        {
+          "epoch": 2,
+          "lr": 0.001,
+          "train_loss": 0.3,
+          "training_time_s": 75.384,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.94,
+            "f1": 0.949,
+            "roc_auc": 0.648
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.904,
+            "f1": 0.919,
+            "roc_auc": 0.687
+          }
+        },
+        {
+          "epoch": 3,
+          "lr": 0.001,
+          "train_loss": 0.3,
+          "training_time_s": 113.239,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.94,
+            "f1": 0.949,
+            "roc_auc": 0.655
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.908,
+            "f1": 0.919,
+            "roc_auc": 0.706
+          }
+        },
+        {
+          "epoch": 4,
+          "lr": 0.001,
+          "train_loss": 0.3,
+          "training_time_s": 151.228,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.941,
+            "f1": 0.949,
+            "roc_auc": 0.66
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.91,
+            "f1": 0.919,
+            "roc_auc": 0.708
+          }
+        },
+        {
+          "epoch": 5,
+          "lr": 0.001,
+          "train_loss": 0.3,
+          "training_time_s": 188.928,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.941,
+            "f1": 0.949,
+            "roc_auc": 0.656
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.91,
+            "f1": 0.919,
+            "roc_auc": 0.709
+          }
+        },
+        {
+          "epoch": 6,
+          "lr": 0.001,
+          "train_loss": 0.299,
+          "training_time_s": 226.669,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.941,
+            "f1": 0.949,
+            "roc_auc": 0.66
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.91,
+            "f1": 0.919,
+            "roc_auc": 0.71
+          }
+        },
+        {
+          "epoch": 7,
+          "lr": 0.0,
+          "train_loss": 0.299,
+          "training_time_s": 263.806,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.941,
+            "f1": 0.949,
+            "roc_auc": 0.661
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.909,
+            "f1": 0.919,
+            "roc_auc": 0.709
+          }
+        },
+        {
+          "epoch": 8,
+          "lr": 0.0,
+          "train_loss": 0.299,
+          "training_time_s": 301.426,
+          "val_metrics": {
+            "accuracy": 0.903,
+            "average_precision": 0.941,
+            "f1": 0.949,
+            "roc_auc": 0.662
+          },
+          "test_metrics": {
+            "accuracy": 0.851,
+            "average_precision": 0.909,
+            "f1": 0.919,
+            "roc_auc": 0.709
+          }
+        }
+      ],
+      "summary": {
+        "best_epoch": 8,
+        "best_val_metric_name": "roc_auc",
+        "best_val_metric_value": 0.662,
+        "best_val_metrics": {
+          "accuracy": 0.903,
+          "average_precision": 0.941,
+          "f1": 0.949,
+          "roc_auc": 0.662
+        },
+        "best_test_metrics": {
+          "accuracy": 0.851,
+          "average_precision": 0.909,
+          "f1": 0.919,
+          "roc_auc": 0.709
+        },
+        "total_training_time_s": 301.426
+      }
+    }
+  ],
+  "aggregate": {
+    "best_epochs": "[8, 5, 8, 5, 8]",
+    "avg_training_time_s": 300.409,
+    "best_test_accuracy_mean": 0.851,
+    "best_test_accuracy_var": 0.0,
+    "best_test_average_precision_mean": 0.908,
+    "best_test_average_precision_var": 0.0,
+    "best_test_f1_mean": 0.919,
+    "best_test_f1_var": 0.0,
+    "best_test_roc_auc_mean": 0.708,
+    "best_test_roc_auc_var": 0.0,
+    "best_val_accuracy_mean": 0.903,
+    "best_val_accuracy_var": 0.0,
+    "best_val_average_precision_mean": 0.942,
+    "best_val_average_precision_var": 0.0,
+    "best_val_f1_mean": 0.949,
+    "best_val_f1_var": 0.0,
+    "best_val_roc_auc_mean": 0.664,
+    "best_val_roc_auc_var": 0.0
+  }
+}

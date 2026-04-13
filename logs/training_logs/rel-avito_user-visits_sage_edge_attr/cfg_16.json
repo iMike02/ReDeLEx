@@ -1,0 +1,89 @@
+{
+  "run_params": {
+    "process_bridge": true,
+    "bridge_strategy": "keep_table",
+    "process_hub": true,
+    "hub_strategy": "keep_table"
+  },
+  "seed_runs": [
+    {
+      "seed": 42,
+      "epoch_history": [
+        {
+          "epoch": 1,
+          "lr": 0.001,
+          "train_loss": 0.25,
+          "training_time_s": 77.008,
+          "val_metrics": {
+            "accuracy": 0.919,
+            "average_precision": 0.974,
+            "f1": 0.956,
+            "roc_auc": 0.83
+          },
+          "test_metrics": {
+            "accuracy": 0.884,
+            "average_precision": 0.973,
+            "f1": 0.932,
+            "roc_auc": 0.884
+          }
+        },
+        {
+          "epoch": 2,
+          "lr": 0.001,
+          "train_loss": 0.239,
+          "training_time_s": 155.528,
+          "val_metrics": {
+            "accuracy": 0.923,
+            "average_precision": 0.975,
+            "f1": 0.959,
+            "roc_auc": 0.833
+          },
+          "test_metrics": {
+            "accuracy": 0.906,
+            "average_precision": 0.974,
+            "f1": 0.946,
+            "roc_auc": 0.888
+          }
+        }
+      ],
+      "summary": {
+        "best_epoch": 2,
+        "best_val_metric_name": "roc_auc",
+        "best_val_metric_value": 0.833,
+        "best_val_metrics": {
+          "accuracy": 0.923,
+          "average_precision": 0.975,
+          "f1": 0.959,
+          "roc_auc": 0.833
+        },
+        "best_test_metrics": {
+          "accuracy": 0.906,
+          "average_precision": 0.974,
+          "f1": 0.946,
+          "roc_auc": 0.888
+        },
+        "total_training_time_s": 155.528
+      }
+    }
+  ],
+  "aggregate": {
+    "best_epochs": "[2]",
+    "avg_training_time_s": 155.528,
+    "best_test_accuracy_mean": 0.906,
+    "best_test_accuracy_var": 0.0,
+    "best_test_average_precision_mean": 0.974,
+    "best_test_average_precision_var": 0.0,
+    "best_test_f1_mean": 0.946,
+    "best_test_f1_var": 0.0,
+    "best_test_roc_auc_mean": 0.888,
+    "best_test_roc_auc_var": 0.0,
+    "best_val_accuracy_mean": 0.923,
+    "best_val_accuracy_var": 0.0,
+    "best_val_average_precision_mean": 0.975,
+    "best_val_average_precision_var": 0.0,
+    "best_val_f1_mean": 0.959,
+    "best_val_f1_var": 0.0,
+    "best_val_roc_auc_mean": 0.833,
+    "best_val_roc_auc_var": 0.0
+  }
+}

@@ -1,33 +1,42 @@
 #!/bin/bash
 #SBATCH --job-name=dbgnn-16combos
-#SBATCH --time=24:00:00
+#SBATCH --time=06:00:00
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=3
-#SBATCH --mem=48G
-#SBATCH --array=0-15
+#SBATCH --mem=32G
+#### --array=0-10
 
 
-declare -a combinations=(
-    'False default False default_combinations'
-    'False default True default_combinations'
-    'False default True keep_attributes'
-    'False default True keep_table'
-    'True default False default_combinations'
-    'True keep_attributes False default_combinations'
-    'True keep_table False default_combinations'
-    'True default True default_combinations'
-    'True default True keep_attributes'
-    'True default True keep_table'
-    'True keep_attributes True default_combinations'
-    'True keep_attributes True keep_attributes'
-    'True keep_attributes True keep_table'
-    'True keep_table True default_combinations'
-    'True keep_table True keep_attributes'
-    'True keep_table True keep_table'
-)
+# declare -a combinations=(
+#     'False default False default_combinations'
+#     'False default True default_combinations'
+#     'False default True keep_attributes'
+#     'False default True keep_table'
+#     'True default False default_combinations'
+#     'True keep_attributes False default_combinations'
+#     'True keep_table False default_combinations'
+#     'True default True default_combinations'
+#     'True default True keep_attributes'
+#     'True default True keep_table'
+#     'True keep_attributes True default_combinations'
+#     'True keep_attributes True keep_attributes'
+#     'True keep_attributes True keep_table'
+#     'True keep_table True default_combinations'
+#     'True keep_table True keep_attributes'
+#     'True keep_table True keep_table'
+# )
+process_bridge='False'
+bridge_strategy='default'
+process_hub='False'
+hub_strategy='default_combinations'
 
-VENV_PATH="/home/gabrimi8/ReDeLEx/.venv"
+# -----------------------------TADY VYBÍRÁM DATASET A TASK------------------------------
+dataset='rel-stack'
+task='user-engagement'
+# --------------------------------------------------------------------------------------
+
+VENV_PATH="/home/gabrimi8/RDL/ReDeLEx/.venv"
 
 # Activate the local virtual environment
 source "${VENV_PATH}/bin/activate"
@@ -52,13 +61,11 @@ mkdir -p $experiment_dir
 
 # Run experiment with different params
 
-combo=${combinations[$SLURM_ARRAY_TASK_ID]}
-# Split into 4 variables
-read -r process_bridge bridge_strategy process_hub hub_strategy <<< "$combo"
+# combo=${combinations[$SLURM_ARRAY_TASK_ID]}
+# # Split into 4 variables
+# read -r process_bridge bridge_strategy process_hub hub_strategy <<< "$combo"
 
-# -----------------------------TADY VYBÍRÁM DATASET A TASK------------------------------
-read -r dataset task <<< 'rel-f1 driver-position'
-# --------------------------------------------------------------------------------------
+
 
 combo_id="${SLURM_ARRAY_TASK_ID}"
 log_dir=${experiment_dir}/${dataset}_${task}

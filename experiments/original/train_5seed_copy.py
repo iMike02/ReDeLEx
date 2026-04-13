@@ -720,32 +720,32 @@ def run_training(
 if __name__ == "__main__":
     # Configuration: Edit config dict or pass CLI args (CLI takes priority)
     config = {
-        "dataset": "rel-avito",
-        "task": "ad-ctr",
+        "dataset": "rel-stack",
+        "task": "post-votes",
         "model": "sage_edge_attr",  # "sage" | "dbformer" | "sage_edge_attr"
         "tabular_model": "resnet",  # "resnet" | "linear"
         "seed": 42,
-        "seeds": [42, 43, 44, 45, 46],
+        "seeds": [],  # [42, 43, 44, 45, 46],
         "lr": 0.001,  # 0.001
-        "min_epochs": 10,  # 10
+        "min_epochs": 2,  # 10
         "batch_size": 1024,  # 128
         "channels": 64,  # 64
         "num_layers": 2,  # 2
         "num_neighbors": 32,  # 32
         "max_steps_per_epoch": 1000,  # 1000
-        "min_total_steps": 10000,  # 1000 + lr_decay_steps
+        "min_total_steps": 5000,  # 1000 + lr_decay_steps
         "aggr": "sum",
         "mlp_norm": "batch_norm",
-        "lr_decay_start_step": 3000,  # 1000
-        "lr_decay_steps": 7000,  # 2000
+        "lr_decay_start_step": 2000,  # 1000
+        "lr_decay_steps": 3000,  # 3000
         "cache_dir": ".cache",
         "log_dir": "logs/training_logs",
         "toggle_logging": True,
         "toggle_summary_csv": True,
-        "process_bridge": False,
-        "bridge_strategy": "default",  # "default" | "keep_attributes" | "keep_table"
-        "process_hub": False,
-        "hub_strategy": "default_combinations",  # "default_combinations" | "keep_attributes" | "keep_table"
+        "process_bridge": True,
+        "bridge_strategy": "keep_table",  # "default" | "keep_attributes" | "keep_table"
+        "process_hub": True,
+        "hub_strategy": "keep_table",  # "default_combinations" | "keep_attributes" | "keep_table"
     }
 
     # Parse CLI args (optional, defaults from config above)
