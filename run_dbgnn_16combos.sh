@@ -5,7 +5,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=3
 #SBATCH --mem=32G
-#### --array=0-10
+#### --array=0-15
 
 
 # declare -a combinations=(
