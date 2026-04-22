@@ -478,7 +478,9 @@ def run_training(
     tune_metric, higher_is_better = get_tune_metric(dataset_name, task_name)
     metrics = get_metrics(dataset_name, task_name)
 
-    is_temporal = is_temporal_task(task)
+    is_temporal = is_temporal_task(task) and any(
+        hasattr(data[node_type], "time") for node_type in data.node_types
+    )
 
     loader_dict: Dict[str, NeighborLoader] = {}
     for split in ["train", "val", "test"]:
@@ -720,8 +722,8 @@ def run_training(
 if __name__ == "__main__":
     # Configuration: Edit config dict or pass CLI args (CLI takes priority)
     config = {
-        "dataset": "rel-stack",
-        "task": "post-votes",
+        "dataset": "ctu-",
+        "task": "item-ltv",
         "model": "sage_edge_attr",  # "sage" | "dbformer" | "sage_edge_attr"
         "tabular_model": "resnet",  # "resnet" | "linear"
         "seed": 42,
@@ -744,8 +746,8 @@ if __name__ == "__main__":
         "toggle_summary_csv": True,
         "process_bridge": True,
         "bridge_strategy": "keep_table",  # "default" | "keep_attributes" | "keep_table"
-        "process_hub": True,
-        "hub_strategy": "keep_table",  # "default_combinations" | "keep_attributes" | "keep_table"
+        "process_hub": False,
+        "hub_strategy": "default_combinations",  # "default_combinations" | "keep_attributes" | "keep_table"
     }
 
     # Parse CLI args (optional, defaults from config above)

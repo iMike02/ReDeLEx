@@ -221,7 +221,7 @@ def get_data_custom(
     process_bridge: bool = False,
     bridgeStrategy: str = "default",
     process_hub: bool = False,
-    hubStrategy: str = "default_combinations"
+    hubStrategy: str = "default_combinations",
 ):
     """Similar to get_data but uses the custom MakeGraph class with configurable bridge and hub processing."""
     dataset = get_dataset(dataset_name)
@@ -244,8 +244,8 @@ def get_data_custom(
     db_interface.close()
 
     text_embedder = get_text_embedder(text_embedder_name)
-    text_embedder_cfg = TextEmbedderConfig(text_embedder=text_embedder, batch_size=256)
-    
+    text_embedder_cfg = TextEmbedderConfig(text_embedder=text_embedder)
+
     data, col_stats_dict = make_pkey_fkey_graph_custom(
         db,
         col_to_stype_dict=attribute_schema,
@@ -254,7 +254,7 @@ def get_data_custom(
         process_bridge=process_bridge,
         bridgeStrategy=bridgeStrategy,
         process_hub=process_hub,
-        hubStrategy=hubStrategy
+        hubStrategy=hubStrategy,
     )
 
     if entity_table_only and aggregate_neighbors:
@@ -310,6 +310,7 @@ def test_get_data(
     )
     return db, attribute_schema
 
+
 __all__ = [
     "get_text_embedder",
     "get_hyperparams_logging",
@@ -321,6 +322,3 @@ __all__ = [
     "get_data",
     "get_data_custom",
 ]
-
-
-

@@ -1,11 +1,11 @@
 #!/bin/bash
 #SBATCH --job-name=dbgnn-16combos
-#SBATCH --time=06:00:00
+#SBATCH --time=24:00:00
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=3
-#SBATCH --mem=32G
-#### --array=0-10
+#SBATCH --mem-per-cpu=80G
+#### --array=0-15
 
 
 # declare -a combinations=(
@@ -32,8 +32,8 @@ process_hub='False'
 hub_strategy='default_combinations'
 
 # -----------------------------TADY VYBÍRÁM DATASET A TASK------------------------------
-dataset='rel-stack'
-task='user-engagement'
+dataset='rel-amazon'
+task='user-ltv'
 # --------------------------------------------------------------------------------------
 
 VENV_PATH="/home/gabrimi8/RDL/ReDeLEx/.venv"

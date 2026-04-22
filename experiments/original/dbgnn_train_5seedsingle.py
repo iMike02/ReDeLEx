@@ -478,7 +478,9 @@ def run_training(
     tune_metric, higher_is_better = get_tune_metric(dataset_name, task_name)
     metrics = get_metrics(dataset_name, task_name)
 
-    is_temporal = is_temporal_task(task)
+    is_temporal = is_temporal_task(task) and any(
+        hasattr(data[node_type], "time") for node_type in data.node_types
+    )
 
     loader_dict: Dict[str, NeighborLoader] = {}
     for split in ["train", "val", "test"]:
