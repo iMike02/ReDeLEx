@@ -73,7 +73,7 @@ mkdir -p $log_dir
 mkdir -p "${log_dir}/run_logs"
 
 cmd=(
-  python -u experiments/original/dbgnn_train_5seedsingle.py
+  python -u experiments/original/dbgnn_experiment.py
   --dataset="${dataset}"
   --task="${task}"
   --bridge_strategy="${bridge_strategy}"

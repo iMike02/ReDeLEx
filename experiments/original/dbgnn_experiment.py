@@ -134,7 +134,8 @@ def append_run_summary_csv(csv_path: str, row: Dict[str, object]) -> None:
     csv_dir = os.path.dirname(csv_path)
     if csv_dir:
         os.makedirs(csv_dir, exist_ok=True)
-    normalized_row = cast(Dict[str, object], round_floats(row))
+    # Preserve metric precision already set upstream (for example var rounded to 6 decimals).
+    normalized_row = dict(row)
 
     existing_rows: list[Dict[str, str]] = []
     fieldnames: list[str] = list(normalized_row.keys())
@@ -350,7 +351,7 @@ def build_strategy_run_configs(
                 "hub_strategy": hub_opt,
             }
         )
-
+    
     # 3) Bridge-only runs: process_bridge=True, process_hub=False.
     for bridge_opt in unique_bridge_strategies:
         run_configs.append(

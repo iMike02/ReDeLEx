@@ -1,189 +1,190 @@
-# ReDeLEx
+# README: Running `dbgnn_experiment.py`
 
-[![website](https://img.shields.io/badge/website-live-brightgreen)](https://relational.fel.cvut.cz)
-[![PyPI version](https://img.shields.io/pypi/v/redelex?color=brightgreen)](https://pypi.org/project/redelex/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-brightgreen.svg)](https://opensource.org/licenses/MIT)
+This document explains how to run:
 
-**ReDeLEx** (Relational Deep Learning Exploration) is a Python framework for the development and evaluation of **Relational Deep Learning (RDL)** models. It enables end-to-end experimentation with graph-based neural networks on **relational databases (RDBs)**, building on the CTU Relational Learning Repository and fully integrating with the [RelBench](https://github.com/snap-stanford/relbench) interface.
+- `experiments/original/dbgnn_experiment.py`
 
-It provides tools to transform SQL databases into heterogeneous graph representations suitable for Graph Neural Networks (GNNs), supports both static and temporal tasks, and enables a structured comparison across classical and deep learning models.
+It also documents the custom parts of this ReDeLEx pipeline:
 
-## 🧠 Features
+1. `get_data_custom` (custom data preparation logic)
+2. The modified `GraphSAGEEdgeAttr` model (`SAGEEdgeAttrModel`)
 
-- ✅ Supports **direct SQL database connectivity** (local or remote RDBMS)
-- 🔗 Transforms relational schemas into **heterogeneous graphs**
-- 🧩 Automates **attribute type inference** and encoding (categorical, numerical, text, time)
-- 📦 Provides access to **70+ relational datasets** from the [CTU Repository](https://relational.fel.cvut.cz)
-- 🧪 Supports **benchmarking tasks** including binary/multiclass classification, temporal tasks, and pretraining
-- 🧠 Compatible with diverse neural architectures (e.g., GraphSAGE, Transformer-based models)
-- 📊 Evaluates classical ML models (e.g., LightGBM, Propositionalization) alongside RDL models
+## 1) What this script does
 
-## 📦 Installation
+`dbgnn_experiment.py` trains a relational GNN pipeline on RelBench-style tasks.
 
-Install ReDeLEx via pip:
+Main features:
 
-```bash
-pip install redelex
-```
+- Supports models: `sage`, `dbformer`, `sage_edge_attr`
+- Builds one graph once per run configuration, then trains across multiple seeds
+- Supports bridge/hub processing switches in graph construction
+- Logs per-seed and aggregated results (JSON + CSV)
+- Supports optional linear learning-rate decay
 
-If you're using [RelBench](https://github.com/snap-stanford/relbench), the CTU datasets are automatically supported.
+---
 
-## 🚀 Quickstart
+## 2) How to run
 
-### Loading CTU datasets
-
-Using RelBench interface:
-
-```python
-from relbench.datasets import get_dataset
-import redelex
-
-dataset = get_dataset('ctu-seznam')
-db = dataset.get_db()
-```
-
-Using ReDeLEx directly:
-
-```python
-from redelex import datasets as ctu_datasets
-
-dataset = ctu_datasets.Seznam()
-db = dataset.get_db()
-```
-
-### Loading a custom SQL database
-
-```python
-from redelex.datasets import DBDataset
-
-custom_dataset = DBDataset(
-    dialect="mariadb",  # e.g. postgresql, sqlite, mysql
-    driver="mysqlconnector",
-    user="your_user",
-    password="your_password",
-    host="your_host",
-    port=3306,
-    database="your_database"
-)
-
-db = custom_dataset.get_db(upto_test_timestamp=False)
-```
-
-Note: For full examples of task and schema configuration, see [examples in `ctu_datasets.py`](https://github.com/jakubpeleska/ReDeLEx/blob/main/redelex/datasets/ctu_datasets.py).
-
-## 📚 Tasks & Use Cases
-
-ReDeLEx supports:
-
-- **Node-level prediction** (static or temporal)
-- **Link prediction**
-- **Pretraining tasks** via value masking
-- **Database modification** for complex task generation
-
-Each task is backed by a training table and optionally a temporal schema.
-
-## 🏗️ Architecture
-
-RDL models in ReDeLEx are modular and consist of:
-
-1. **Attribute encoders** for tabular data
-2. **Tabular models** (optional, e.g. ResNet)
-3. **Graph Neural Network** layers
-4. **Task-specific heads** (e.g. MLP classifiers)
-
-Supported model examples include:
-
-- Linear SAGE
-- Tabular ResNet + GraphSAGE
-- DBFormer (Transformer-based)
-
-## 📈 Experiments
-
-ReDeLEx includes tools for:
-
-- Selecting RDL-suitable datasets based on structure and size
-- Comparing RDL with traditional ML and propositionalization
-- Benchmarking across 70+ relational datasets from various domains
-
-For experimental results and performance benchmarks, see the [ECML PKDD 2025 paper](https://arxiv.org/abs/XXXX.XXXXX) _(coming soon)_.
-
-## ⚙️ Development
-
-### Install `uv` (recommended for managing environments)
-
-- macOS & Linux
+Run from the ReDeLEx project root:
 
 ```bash
-wget -qO- https://astral.sh/uv/install.sh | sh
+cd /ReDeLEx
+python experiments/original/dbgnn_experiment.py
 ```
 
-- Windows
+The script already contains defaults in its internal `config` dictionary, so the command above runs immediately.
+
+### Common custom run
 
 ```bash
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+python experiments/original/dbgnn_experiment.py \
+  --dataset rel-f1 \
+  --task driver-position \
+  --model sage_edge_attr \
+  --tabular_model resnet \
+  --seeds 42 43 44 45 46 \
+  --batch_size 1024 \
+  --num_layers 2 \
+  --num_neighbors 32 \
+  --process_bridge \
+  --bridge_strategy keep_attributes \
+  --process_hub \
+  --hub_strategy keep_table
 ```
 
-More info: [https://docs.astral.sh/uv/getting-started/installation/](https://docs.astral.sh/uv/getting-started/installation/)
+### Core CLI arguments
 
-### Install dependencies
+- `--dataset`, `--task`: task selection
+- `--model`: `sage | dbformer | sage_edge_attr`
+- `--tabular_model`: `resnet | linear`
+- `--seeds`: list of seeds for repeated runs
+- `--process_bridge`: enable bridge-table processing
+- `--bridge_strategy`: `default | keep_attributes | keep_table`
+- `--process_hub`: enable hub-table processing
+- `--hub_strategy`: `default_combinations | keep_attributes | keep_table`
+- `--toggle_logging` / `--no_toggle_logging`
+- `--toggle_summary_csv` / `--no_toggle_summary_csv`
 
-CPU:
+### Output locations
+
+By default (`--log_dir logs/training_logs`), outputs are written under:
+
+- `logs/training_logs/<dataset>_<task>_<model>/configs.json` (sweep manifest)
+- `logs/training_logs/<dataset>_<task>_<model>/cfg_<k>.json` (seed-wise history + aggregate)
+- `logs/training_logs/<dataset>_<task>_<model>/cfg_<k>.csv` (aggregated summary row)
+
+`cfg_<k>` is determined from the bridge/hub strategy combination.
+
+---
+
+## 3) `get_data_custom` contribution
+
+Defined in:
+
+- `experiments/utils.py` (`get_data_custom`)
+
+### What it is
+
+`get_data_custom(...)` is a customized data-building entry point that extends the standard graph materialization path.
+
+It does the following:
+
+1. Loads dataset/task and obtains DB snapshot (or task-modified DB)
+2. Builds attribute schema and text embedder config
+3. Calls `make_pkey_fkey_graph_custom(...)` instead of the default graph maker
+4. Applies bridge/hub processing logic via:
+   - `process_bridge`, `bridgeStrategy`
+   - `process_hub`, `hubStrategy`
+5. Returns `(task, data, col_stats_dict)` for model training
+
+### Where it is used
+
+In this script, usage is centralized in:
+
+- `build_training_data(...)` inside `experiments/original/dbgnn_experiment.py`
+
+Flow:
+
+- CLI args (`--process_bridge`, `--bridge_strategy`, `--process_hub`, `--hub_strategy`)
+- passed to `build_training_data(...)`
+- forwarded to `get_data_custom(...)`
+- graph + stats returned and reused across all seeds for that config
+
+So `get_data_custom` is the key point where bridge/hub graph construction choices enter the training pipeline.
+
+---
+
+## 4) Modified GraphSAGEEdgeAttr model
+
+Implemented in:
+
+- `redelex/nn/models/sage_edge_attr.py`
+
+Model class used by this script:
+
+- `SAGEEdgeAttrModel`
+
+### How the script selects it
+
+In `dbgnn_experiment.py`:
+
+- `get_model(...)` returns `SAGEEdgeAttrModel(...)` when `--model sage_edge_attr`
+
+### What is modified vs standard GraphSAGE
+
+The edge-aware path introduces custom message passing:
+
+- `EdgeAttrSAGEConv` extends `MessagePassing`
+- If edge attributes are present, message is:
+  - `message = x_j + Linear(edge_attr)`
+- If edge attributes are absent, fallback is standard behavior:
+  - `message = x_j`
+
+Then normal GraphSAGE-style transformations are applied (`lin_l`, `lin_r`, optional normalization).
+
+### Heterogeneous edge-aware stack
+
+- `HeteroEdgeAttrGraphSAGE` creates one `EdgeAttrSAGEConv` per edge type
+- Supports mixed edge types: some with edge attributes, some without
+- Uses `HeteroConv(..., aggr="sum")` + per-node-type `LayerNorm` + ReLU for each layer
+
+### Automatic edge dimension discovery
+
+`SAGEEdgeAttrModel` can infer `edge_dim_dict` automatically from `data[edge_type].edge_attr` shape via `_derive_edge_dim_dict(...)`.
+
+That means the model works without manually specifying edge dimensions in common cases.
+
+### End-to-end architecture
+
+`SAGEEdgeAttrModel` preserves the same high-level structure as baseline SAGE for fair comparison:
+
+1. `HeteroEncoder` for tabular node features
+2. `HeteroTemporalEncoder` for time-aware tasks
+3. `HeteroEdgeAttrGraphSAGE` for message passing with optional edge attributes
+4. `MLP` prediction head
+
+This modification is focused on the GNN message-passing core while keeping the rest of the training stack comparable.
+
+---
+
+## 5) Practical notes
+
+- Run from ReDeLEx root so imports like `from experiments.utils ...` resolve correctly.
+- If a bridge/hub strategy combination is passed that is not in the canonical config mapping, config-id resolution may fail.
+- For faster sanity checks, reduce:
+  - `--max_steps_per_epoch`
+  - `--min_total_steps`
+  - `--seeds`
+
+Example quick debug run:
 
 ```bash
-uv sync
-uv pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.4.0+cpu.html
+python experiments/original/dbgnn_experiment.py \
+  --dataset rel-f1 \
+  --task driver-position \
+  --model sage_edge_attr \
+  --seeds 42 \
+  --max_steps_per_epoch 50 \
+  --min_total_steps 200 \
+  --batch_size 256
 ```
-
-CUDA 12.8:
-
-```bash
-uv sync --no-group cpu --group cu128
-uv pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.8.0+cu128.html
-```
-
-CUDA 12.4 (Old CUDA env):
-
-```bash
-uv sync --no-group cpu --group cu124
-uv pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.4.0+cu124.html
-```
-
-CUDA 12.1 (RCI Setup):
-
-```bash
-uv sync --no-group cpu --group cu121
-uv pip install pyg_lib==0.3.1 torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.1.2+cu121.html
-```
-
-### Enable and run `pre-commit`
-
-```bash
-uv run pre-commit install
-uv run pre-commit run
-```
-
-### Database schema visualizations
-
-Visualizations run on `Graphviz`, which needs to be available on your system.
-
-- Install `Graphviz` https://graphviz.org/download/
-
-## 📜 Citation
-
-If you use ReDeLEx in your work, please cite:
-
-```
-@misc{peleska2025redelex,
-  title={REDELEX: A Framework for Relational Deep Learning Exploration},
-  author={Jakub Peleška and Gustav Šír},
-  year={2025},
-  eprint={2506.22199},
-  archivePrefix={arXiv},
-  primaryClass={cs.LG},
-  url={https://arxiv.org/abs/2506.22199},
-}
-```
-
-## 📎 Acknowledgements
-
-This project has received funding from the European Union’s Horizon Europe program under the grant agreement TUPLES No. 101070149, and the Czech Science Foundation grant No. 24-11664S.
